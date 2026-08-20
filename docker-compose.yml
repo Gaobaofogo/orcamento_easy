@@ -1,0 +1,192 @@
+services:
+  # Serviço de Banco de Dados Relacional (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: marcenaria_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: marcenaria_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d marcenaria_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Serviço de Armazenamento de Arquivos em Nuvem (MinIO Object Storage)
+#   storage:
+#     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
+#     container_name: marcenaria_storage
+#     command: server /data --console-address ":9001"
+#     ports:
+#       - "9000:9000"  # S3 API
+#       - "9001:9001"  # Console Web MinIO
+#     environment:
+#       MINIO_ROOT_USER: minioadmin
+#       MINIO_ROOT_PASSWORD: minioadmin
+#     volumes:
+#       - storage_data:/data
+#     healthcheck:
+#       test: ["CMD", "mc", "ready", "local"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 5
+# 
+#   # Container utilitário para criação e configuração automática do bucket
+#   createbuckets:
+#     image: minio/mc:RELEASE.2024-01-16T16-06-34Z
+#     container_name: marcenaria_createbuckets
+#     depends_on:
+#       storage:
+#         condition: service_healthy
+#     entrypoint: >
+#       /bin/sh -c "
+#       /usr/bin/mc alias set myminio http://storage:9000 minioadmin minioadmin;
+#       /usr/bin/mc mb myminio/marcenaria-uploads --ignore-existing;
+#       /usr/bin/mc anonymous set download myminio/marcenaria-uploads;
+#       exit 0;
+#       "
+
+  # Serviço do MinIO
+  storage:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
+    container_name: marcenaria_storage
+    command: server /data --console-address ":9001"
+    ports:
+      - "127.0.0.1:9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./storage_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Utilitário para criar o bucket
+  createbuckets:
+    image: minio/mc:RELEASE.2024-01-16T16-06-34Z
+    container_name: marcenaria_createbuckets
+    depends_on:
+      storage:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c '
+      /usr/bin/mc alias set myminio http://storage:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD";
+      /usr/bin/mc mb myminio/marcenaria-uploads --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/marcenaria-uploads;
+      exit 0;
+      '
+
+  ##### PRODUCTION #####
+  # Serviço Backend (FastAPI Python)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+      target: "prod"
+    profiles: ["prod"]
+    container_name: marcenaria_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/marcenaria_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespassword
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=marcenaria_db
+      - STORAGE_TYPE=minio
+      - MINIO_ENDPOINT=storage:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=marcenaria-uploads
+      - LOCAL_STORAGE_DIR=/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+      - ./backend:/app/backend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      target: "prod"
+    profiles: ["prod"]
+    container_name: marcenaria_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+  ##### END PRODUCTION #####
+
+  ##### DEVELOPMENT #####
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+      target: "dev"
+    profiles: ["dev"]
+    container_name: marcenaria_backend_dev
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=dev
+      - JWT_SECRET="0u7|=acHp,hF;UK-Z|[MvXGBAV56w7:S3x(CPzNR}?9"
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/marcenaria_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespassword
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=marcenaria_db
+      - STORAGE_TYPE=minio
+      - MINIO_ENDPOINT=storage:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET=marcenaria-uploads
+      - LOCAL_STORAGE_DIR=/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    volumes:
+      - backend_uploads:/app/uploads
+      - ./backend:/app/backend
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      target: "dev"
+    profiles: ["dev"]
+    container_name: marcenaria_frontend_dev
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend-dev:8000
+    depends_on:
+      - backend-dev
+  ##### END DEVELOPMENT #####
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_uploads:
+    driver: local
+

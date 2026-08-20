@@ -1,0 +1,6 @@
+{
+  "name": "Sistema Gerencial de Orçamentos",
+  "description": "Sistema para gestão de clientes, orçamentos e itens com autenticação JWT e relatórios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,54 @@
+@api_url = http://localhost:8000
+
+### CREATE Cliente
+# @name registerClient
+POST {{api_url}}/api/auth/register
+Content-Type: application/json
+
+{
+    "nome": "Usuário",
+    "email": "email@email.com",
+    "senha": "Senha123!"
+}
+
+###
+
+@token = {{registerClient.response.body.token}}
+@user_id = {{registerClient.response.body.user.id}}
+
+
+### GET Cliente info
+# @name getClientInfo
+GET {{api_url}}/api/auth/me
+
+
+### DELETE Cliente
+DELETE {{api_url}}/api/clients/{{user_id}}
+
+
+### CREATE Orçamento com arquivo
+# @name createOrcamento
+POST {{api_url}}/api/orcamento
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=MeuBoundarySeparador
+--MeuBoundarySeparador
+Content-Disposition: form-data; name="descricao"
+
+Orçamento para projeto X
+--MeuBoundarySeparador
+Content-Disposition: form-data; name="arquivo"; filename="teste.pdf"
+Content-Type: application/pdf
+
+< ./teste.pdf
+--MeuBoundarySeparador--
+Content-Disposition: form-data; name="cliente_id";
+
+{{user_id}}
+--MeuBoundarySeparador--
+Content-Disposition: form-data; name="data";
+
+12/12/2012
+--MeuBoundarySeparador--
+
+Content-Disposition: form-data; name="cliente_id";
+--MeuBoundarySeparador--
