@@ -5,52 +5,18 @@ services:
     container_name: marcenaria_db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: marcenaria_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d marcenaria_db"]
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # Serviço de Armazenamento de Arquivos em Nuvem (MinIO Object Storage)
-#   storage:
-#     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
-#     container_name: marcenaria_storage
-#     command: server /data --console-address ":9001"
-#     ports:
-#       - "9000:9000"  # S3 API
-#       - "9001:9001"  # Console Web MinIO
-#     environment:
-#       MINIO_ROOT_USER: minioadmin
-#       MINIO_ROOT_PASSWORD: minioadmin
-#     volumes:
-#       - storage_data:/data
-#     healthcheck:
-#       test: ["CMD", "mc", "ready", "local"]
-#       interval: 5s
-#       timeout: 5s
-#       retries: 5
-# 
-#   # Container utilitário para criação e configuração automática do bucket
-#   createbuckets:
-#     image: minio/mc:RELEASE.2024-01-16T16-06-34Z
-#     container_name: marcenaria_createbuckets
-#     depends_on:
-#       storage:
-#         condition: service_healthy
-#     entrypoint: >
-#       /bin/sh -c "
-#       /usr/bin/mc alias set myminio http://storage:9000 minioadmin minioadmin;
-#       /usr/bin/mc mb myminio/marcenaria-uploads --ignore-existing;
-#       /usr/bin/mc anonymous set download myminio/marcenaria-uploads;
-#       exit 0;
-#       "
 
   # Serviço do MinIO
   storage:
@@ -97,16 +63,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/marcenaria_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgrespassword
+      - APP_ENV=prod
+      - JWT_SECRET=${BACKEND_JWT_SECRET}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=marcenaria_db
-      - STORAGE_TYPE=minio
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
       - MINIO_ENDPOINT=storage:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=marcenaria-uploads
       - LOCAL_STORAGE_DIR=/app/uploads
     depends_on:
@@ -128,7 +95,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://backend:8000
     depends_on:
       - backend
   ##### END PRODUCTION #####
@@ -145,14 +112,13 @@ services:
       - "8000:8000"
     environment:
       - APP_ENV=dev
-      - JWT_SECRET="0u7|=acHp,hF;UK-Z|[MvXGBAV56w7:S3x(CPzNR}?9"
-      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/marcenaria_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgrespassword
+      - JWT_SECRET="${BACKEND_JWT_SECRET}"
+      - POSTGRES_DB="${POSTGRES_DB}"
+      - POSTGRES_USER="${POSTGRES_USER}"
+      - POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
       - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=marcenaria_db
-      - STORAGE_TYPE=minio
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
       - MINIO_ENDPOINT=storage:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
