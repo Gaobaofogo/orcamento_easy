@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from backend import schemas
-from backend.auth import ALGORITHM, JWT_SECRET, create_access_token, get_current_user
+from backend.auth import ALGORITHM, JWT_SECRET, create_access_token, get_current_user, generate_password, check_password
 from backend.database import Base, engine, get_db
 from backend.models import Cliente, ItemOrcamento, Orcamento, User
 from backend.storage import storage_manager
@@ -52,9 +52,6 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)})
 
 
-# --- AUTH ROUTES ---
-
-
 @app.post(
     "/api/auth/register",
     response_model=schemas.LoginResponse,
@@ -63,10 +60,6 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
 def register_user(
     payload: schemas.UserRegister, response: Response, db: Session = Depends(get_db)
 ):
-    start_op = time.time()
-    payload_dict = (
-        payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
-    )
     if not payload.nome or not payload.email or not payload.senha:
         err_msg = "Nome, e-mail e senha são obrigatórios."
         raise HTTPException(status_code=400, detail=err_msg)
@@ -86,7 +79,7 @@ def register_user(
         id=user_id,
         nome=payload.nome,
         email=payload.email.lower(),
-        senha=payload.senha,
+        senha=generate_password(payload.senha),
         razaoSocial=payload.razaoSocial or "",
         nomeFantasia=payload.nomeFantasia or "",
         cnpj=payload.cnpj or "",
@@ -105,7 +98,6 @@ def register_user(
         {"id": new_user.id, "email": new_user.email, "nome": new_user.nome}
     )
 
-    # Armazena o token em cookie HttpOnly com SameSite=Strict
     response.set_cookie(
         key="access_token",
         value=token,
@@ -127,14 +119,13 @@ def register_user(
 def login_user(
     payload: schemas.UserLogin, response: Response, db: Session = Depends(get_db)
 ):
-    start_op = time.time()
     if not payload.email or not payload.senha:
         raise HTTPException(
             status_code=400, detail="Por favor, informe e-mail e senha."
         )
 
     user = db.query(User).filter(User.email == payload.email.lower()).first()
-    if not user or user.senha != payload.senha:
+    if not user or not check_password(payload.senha, str(user.senha)):
         raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
 
     token = create_access_token({"id": user.id, "email": user.email, "nome": user.nome})

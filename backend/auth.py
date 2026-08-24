@@ -8,12 +8,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from passlib.context import CryptContext
 from backend.models import User
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 
 security = HTTPBearer(auto_error=False)
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def create_access_token(
@@ -78,3 +80,9 @@ def get_current_user(
             detail="Usuário não encontrado ou não autorizado.",
         )
     return user
+
+def generate_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def check_password(password: str, stored_password: str) -> bool:
+    return pwd_context.verify(password, stored_password)

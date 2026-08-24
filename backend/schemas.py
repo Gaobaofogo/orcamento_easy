@@ -2,13 +2,13 @@ import json
 from typing import List, Optional
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, Field
 
 
 class UserRegister(BaseModel):
     nome: str
     email: str
-    senha: str
+    senha: str = Field(min_length=8, max_length=64)
     razaoSocial: Optional[str] = ""
     nomeFantasia: Optional[str] = ""
     cnpj: Optional[str] = ""
