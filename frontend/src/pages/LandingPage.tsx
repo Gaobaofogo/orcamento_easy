@@ -5,14 +5,10 @@ import {
   FileText,
   Users,
   Calculator,
-  ShieldCheck,
   ArrowRight,
   CheckCircle2,
   Sparkles,
-  Layers,
   Ruler,
-  TrendingUp,
-  Clock,
   ChevronRight,
   LogIn,
   UserPlus,
@@ -64,7 +60,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
 
                 <button
                   onClick={() => navigate('/cadastro')}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-slate-200 font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>Cadastrar Marcenaria</span>
@@ -107,7 +103,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
               <>
                 <button
                   onClick={() => navigate('/cadastro')}
-                  className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer group"
+                  className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-200 font-black text-base rounded-2xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer group"
                 >
                   <UserPlus className="w-5 h-5" />
                   <span>Cadastre sua Marcenaria Grátis</span>
@@ -213,7 +209,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
               <>
                 <button
                   onClick={() => navigate('/cadastro')}
-                  className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-950 font-black rounded-2xl shadow-xl shadow-orange-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-200 font-black rounded-2xl shadow-xl shadow-orange-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <UserPlus className="w-5 h-5" />
                   <span>Cadastrar Minha Marcenaria</span>

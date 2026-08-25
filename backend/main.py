@@ -305,9 +305,6 @@ def get_me(current_user: User = Depends(get_current_user)):
     }
 
 
-# --- CLIENTES CRUD ---
-
-
 @app.get("/api/clientes", response_model=List[schemas.ClienteResponse])
 def get_clientes(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
@@ -327,10 +324,6 @@ def create_cliente(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    start_op = time.time()
-    payload_dict = (
-        payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
-    )
     if not payload.nome or not payload.celular or not payload.email:
         err_msg = "Nome, celular e e-mail são obrigatórios."
         raise HTTPException(status_code=400, detail=err_msg)
@@ -342,6 +335,7 @@ def create_cliente(
 
     new_cliente = Cliente(
         id=cliente_id,
+        user_id=current_user.id,
         nome=payload.nome,
         celular=payload.celular,
         email=payload.email,

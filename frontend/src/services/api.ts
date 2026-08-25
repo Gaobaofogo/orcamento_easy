@@ -207,19 +207,74 @@ export async function fetchOrcamentoById(id: string): Promise<Orcamento> {
   return res.json();
 }
 
-export async function createOrcamento(orcamentoData: any): Promise<Orcamento> {
+function base64ToFile(base64String: string, filename: string): File {
+  const arr = base64String.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+  const bstr = atob(arr[1] || arr[0]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
+
+export async function createOrcamento(orcamentoData: Record<string, any>): Promise<Orcamento> {
+  const formData = new FormData();
+
+  Object.keys(orcamentoData).forEach((key) => {
+    const value = orcamentoData[key];
+
+    if (value !== undefined && value !== null) {
+      if (key === 'arquivo' && typeof value === 'string' && value.startsWith('data:')) {
+        formData.append(key, base64ToFile(value, 'orcamento.pdf'));
+      } 
+      else if (key === 'itens') {
+        // Garantia: se já for string, manda direto. Se for array/objeto, faz o stringify 1 única vez.
+        const itensString = typeof value === 'string' ? value : JSON.stringify(value);
+        formData.append('itens', itensString);
+      } 
+      else if (value instanceof File || value instanceof Blob) {
+        formData.append(key, value);
+      } else {
+        formData.append(key, String(value));
+      }
+    }
+  });
+
+  const headers = new Headers(getAuthHeaders());
+  headers.delete('Content-Type');
+  headers.delete('content-type');
+
   const res = await fetch('/api/orcamentos', {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: headers,
     credentials: 'include',
-    body: JSON.stringify(orcamentoData)
+    body: formData
   });
+
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Erro ao criar orçamento.');
+    throw new Error(data.detail ? JSON.stringify(data.detail) : data.error || 'Erro ao criar orçamento.');
   }
+
   return data;
 }
+
+// export async function createOrcamento(orcamentoData: any): Promise<Orcamento> {
+//   const res = await fetch('/api/orcamentos', {
+//     method: 'POST',
+//     headers: getAuthHeaders(),
+//     credentials: 'include',
+//     body: JSON.stringify(orcamentoData)
+//   });
+//   const data = await res.json();
+//   if (!res.ok) {
+//     throw new Error(data.error || 'Erro ao criar orçamento.');
+//   }
+//   return data;
+// }
 
 export async function updateOrcamento(id: string, orcamentoData: any): Promise<Orcamento> {
   const res = await fetch(`/api/orcamentos/${id}`, {

@@ -28,6 +28,7 @@ class Cliente(Base):
     __tablename__ = "clientes"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     nome = Column(String, nullable=False)
     celular = Column(String, nullable=False)
     email = Column(String, nullable=False)

@@ -133,7 +133,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - backend_uploads:/app/uploads
-      - ./backend:/app/backend
+      - ./backend:/app
 
   frontend-dev:
     build:
@@ -146,6 +146,8 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_URL=http://backend-dev:8000
+    volumes:
+      - ./frontend:/app
     depends_on:
       - backend-dev
   ##### END DEVELOPMENT #####

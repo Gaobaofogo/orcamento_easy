@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
-import { FileText, Lock, Mail, ArrowRight, CheckCircle2, ShieldCheck, UserPlus } from 'lucide-react';
+import { FileText, Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, UserPlus } from 'lucide-react';
 
 interface LoginPageProps {
   navigate: (path: string) => void;
@@ -16,6 +16,7 @@ interface LoginFormInputs {
 export const LoginPage: React.FC<LoginPageProps> = ({ navigate, addToast }) => {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -107,7 +108,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ navigate, addToast }) => {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   {...register('senha', {
                     required: 'A senha é obrigatória.',
@@ -118,6 +119,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ navigate, addToast }) => {
                   })}
                   className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
               {errors.senha && (
                 <p className="text-xs text-rose-600 mt-1">{errors.senha.message}</p>

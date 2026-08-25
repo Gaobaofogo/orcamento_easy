@@ -4,17 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { registerApi } from '../services/api';
 import { maskPhoneInput, maskCNPJInput } from '../utils/formatters';
 import {
-  FileText,
   User,
   Mail,
   Lock,
-  Building2,
-  Phone,
-  MapPin,
   ArrowRight,
   ArrowLeft,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface CadastroPageProps {
@@ -38,6 +36,8 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
   const { setToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const {
     register,
@@ -60,6 +60,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
   });
 
   const senhaValue = watch('senha');
+  const confirmaSenhaValue = watch('confirmaSenha');
 
   const onSubmit = async (data: CadastroFormInputs) => {
     if (data.senha !== data.confirmaSenha) {
@@ -178,7 +179,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Mínimo 8 caracteres e símbolos"
                     {...register('senha', {
                       required: 'A senha é obrigatória.',
@@ -203,6 +204,18 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
                     })}
                     className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
                 {errors.senha && (
                   <p className="text-xs text-rose-600 mt-1 font-medium">{errors.senha.message}</p>
@@ -218,7 +231,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     placeholder="Repita a senha"
                     {...register('confirmaSenha', {
                       required: 'A confirmação é obrigatória.',
@@ -226,6 +239,18 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
                     })}
                     className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
                 {errors.confirmaSenha && (
                   <p className="text-xs text-rose-600 mt-1 font-medium">{errors.confirmaSenha.message}</p>
@@ -251,6 +276,9 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
                 </span>
                 <span className={`flex items-center gap-1 sm:col-span-2 ${/[^A-Za-z0-9]/.test(senhaValue || '') ? 'text-emerald-600 font-semibold' : 'text-slate-500'}`}>
                   {/[^A-Za-z0-9]/.test(senhaValue || '') ? '✓' : '•'} Pelo menos 1 caractere especial (@, #, $, !, etc.)
+                </span>
+                <span className={`flex items-center gap-1 sm:col-span-2 ${(senhaValue.length > 0 && confirmaSenhaValue.length > 0 && senhaValue == confirmaSenhaValue) ? 'text-emerald-600 font-semibold' : 'text-slate-500'}`}>
+                  {(senhaValue.length > 0 && confirmaSenhaValue.length > 0 && senhaValue == confirmaSenhaValue) ? '✓' : '•'} As senhas devem ser iguais
                 </span>
               </div>
             </div>
@@ -340,7 +368,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-4 cursor-pointer"
+              className="w-full py-2.5 px-4 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-4 cursor-pointer"
             >
               {loading ? (
                 <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-950 border-t-transparent" />
