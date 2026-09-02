@@ -262,33 +262,61 @@ export async function createOrcamento(orcamentoData: Record<string, any>): Promi
   return data;
 }
 
-// export async function createOrcamento(orcamentoData: any): Promise<Orcamento> {
-//   const res = await fetch('/api/orcamentos', {
-//     method: 'POST',
-//     headers: getAuthHeaders(),
-//     credentials: 'include',
-//     body: JSON.stringify(orcamentoData)
-//   });
-//   const data = await res.json();
-//   if (!res.ok) {
-//     throw new Error(data.error || 'Erro ao criar orçamento.');
-//   }
-//   return data;
-// }
-
 export async function updateOrcamento(id: string, orcamentoData: any): Promise<Orcamento> {
+  console.log(orcamentoData);
+  const formData = new FormData();
+
+  Object.keys(orcamentoData).forEach((key) => {
+    const value = orcamentoData[key];
+
+    if (value !== undefined && value !== null) {
+      if (key === 'arquivo' && typeof value === 'string' && value.startsWith('data:')) {
+        formData.append(key, base64ToFile(value, 'orcamento.pdf'));
+      } 
+      else if (key === 'itens') {
+        // Garantia: se já for string, manda direto. Se for array/objeto, faz o stringify 1 única vez.
+        const itensString = typeof value === 'string' ? value : JSON.stringify(value);
+        formData.append('itens', itensString);
+      } 
+      else if (value instanceof File || value instanceof Blob) {
+        formData.append(key, value);
+      } else {
+        formData.append(key, String(value));
+      }
+    }
+  });
+
+  const headers = new Headers(getAuthHeaders());
+  headers.delete('Content-Type');
+  headers.delete('content-type');
+
   const res = await fetch(`/api/orcamentos/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: headers,
     credentials: 'include',
-    body: JSON.stringify(orcamentoData)
+    body: formData
   });
+
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error || 'Erro ao atualizar orçamento.');
   }
   return data;
 }
+
+// export async function updateOrcamento(id: string, orcamentoData: any): Promise<Orcamento> {
+//   const res = await fetch(`/api/orcamentos/${id}`, {
+//     method: 'PUT',
+//     headers: getAuthHeaders(),
+//     credentials: 'include',
+//     body: JSON.stringify(orcamentoData)
+//   });
+//   const data = await res.json();
+//   if (!res.ok) {
+//     throw new Error(data.error || 'Erro ao atualizar orçamento.');
+//   }
+//   return data;
+// }
 
 export async function deleteOrcamento(id: string): Promise<{ message: string }> {
   const res = await fetch(`/api/orcamentos/${id}`, {
@@ -302,4 +330,35 @@ export async function deleteOrcamento(id: string): Promise<{ message: string }> 
     throw new Error(data.error || 'Erro ao excluir orçamento.');
   }
   return data;
+}
+
+export async function getOrcamentoFile(orcamento_id: string): Promise<File> {
+  const res = await fetch(`/api/orcamentos/${orcamento_id}/pdf`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+ 
+  const blob = res.blob();
+  if (!res.ok) {
+    throw new Error(data.error || 'Erro ao excluir orçamento.');
+  }
+ 
+  return new File([await blob], res.headers.get("content-disposition"), { type: blob.type });
+}
+
+
+export async function getAnexoFile(file_id: string): Promise<File> {
+  const res = await fetch(`/api/files/${file_id}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+ 
+  const blob = res.blob();
+  if (!res.ok) {
+    throw new Error(res.error || 'Erro ao excluir orçamento.');
+  }
+ 
+  return new File([await blob], res.headers.get("content-disposition"), { type: blob.type });
 }

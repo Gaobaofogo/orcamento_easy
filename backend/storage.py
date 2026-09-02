@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import UploadFile
 from minio import Minio
 
-from backend.metrics import log_creation_event, logger
+from metrics import log_creation_event, logger
 
 RAW_ENDPOINT = os.getenv("MINIO_ENDPOINT", "storage:9000")
 MINIO_ENDPOINT = RAW_ENDPOINT.replace("http://", "").replace("https://", "")

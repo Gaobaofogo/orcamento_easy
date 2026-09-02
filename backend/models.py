@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
-from backend.database import Base
+from database import Base
 
 
 class User(Base):
@@ -33,6 +33,7 @@ class Cliente(Base):
     celular = Column(String, nullable=False)
     email = Column(String, nullable=False)
     apelido = Column(String, nullable=False)
+    endereco = Column(String, nullable=False, default="")
     criadoEm = Column(String, nullable=False)
 
     orcamentos = relationship(
@@ -62,6 +63,10 @@ class Orcamento(Base):
     itens = relationship(
         "ItemOrcamento", back_populates="orcamento", cascade="all, delete-orphan"
     )
+
+    @property
+    def valor_total(self) -> float:
+        return sum(item.valor for item in self.itens if item.valor)
 
 
 class ItemOrcamento(Base):

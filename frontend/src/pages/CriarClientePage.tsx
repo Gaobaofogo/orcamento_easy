@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createCliente, updateCliente } from '../services/api';
 import { Cliente } from '../types';
 import { maskPhoneInput } from '../utils/formatters';
-import { User, Phone, Mail, Tag, ArrowLeft, Save, Users, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Mail, Tag, ArrowLeft, Save, Users, CheckCircle2, MapPinHouse } from 'lucide-react';
 
 interface CriarClientePageProps {
   editingCliente: Cliente | null;
@@ -17,6 +17,7 @@ interface ClienteFormInputs {
   celular: string;
   email: string;
   apelido: string;
+  endereco: string;
 }
 
 export const CriarClientePage: React.FC<CriarClientePageProps> = ({
@@ -38,7 +39,8 @@ export const CriarClientePage: React.FC<CriarClientePageProps> = ({
       nome: '',
       celular: '',
       email: '',
-      apelido: ''
+      apelido: '',
+      endereco: ''
     }
   });
 
@@ -48,14 +50,16 @@ export const CriarClientePage: React.FC<CriarClientePageProps> = ({
         nome: editingCliente.nome,
         celular: editingCliente.celular,
         email: editingCliente.email,
-        apelido: editingCliente.apelido
+        apelido: editingCliente.apelido,
+	endereco: editingCliente.endereco
       });
     } else {
       reset({
         nome: '',
         celular: '',
         email: '',
-        apelido: ''
+        apelido: '',
+	endereco: ''
       });
     }
   }, [editingCliente, reset]);
@@ -204,7 +208,24 @@ export const CriarClientePage: React.FC<CriarClientePageProps> = ({
                 className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
               />
             </div>
-            <p className="text-[11px] text-slate-500">Facilita a identificação rápida na busca de orçamentos.</p>
+          </div>
+
+          {/* Endereço */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+		Endereço
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <MapPinHouse className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Rua Conselheiro Crispiniano, 378 – Sé, São Paulo/SP"
+                {...register('endereco')}
+                className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+              />
+            </div>
           </div>
 
           {/* Submit buttons */}

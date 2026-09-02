@@ -5,11 +5,11 @@ from typing import Optional
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
-from passlib.context import CryptContext
-from backend.models import User
+from database import get_db
+from models import User
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
@@ -81,8 +81,10 @@ def get_current_user(
         )
     return user
 
+
 def generate_password(password: str) -> str:
     return pwd_context.hash(password)
+
 
 def check_password(password: str, stored_password: str) -> bool:
     return pwd_context.verify(password, stored_password)

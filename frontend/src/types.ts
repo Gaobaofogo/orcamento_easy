@@ -24,6 +24,7 @@ export interface Orcamento {
   status?: 'Pendente' | 'Aprovado' | 'Recusado' | 'Em Andamento';
   observacoes?: string;
   arquivo?: string;
+  arquivoId?: string;
   arquivoNome?: string;
   introducao?: string;
   materiaPrima?: string;

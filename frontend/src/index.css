@@ -1,1 +1,83 @@
 @import "tailwindcss";
+
+/* @media print {
+     body * {
+ 	visibility: hidden !important;
+     }
+ 
+     .area-impressao-orcamento,
+     .area-impressao-orcamento * {
+ 	visibility: visible !important;
+     }
+ 
+     .area-impressao-orcamento {
+ 	position: absolute !important;
+ 	left: 0 !important;
+ 	top: 0 !important;
+ 	width: 100% !important;
+ 	margin: 0 !important;
+ 	padding: 0 !important;
+     }
+ }*/
+/*@media print {
+  body > * {
+    display: none !important;
+  }
+
+  body > .area-impressao-orcamento,
+  .area-impressao-orcamento {
+    display: block !important;
+    position: static !important; 
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .area-impressao-orcamento * {
+    visibility: visible !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}*/
+/*@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  body {
+    visibility: hidden !important;
+    background: white !important;
+  }
+
+  .imprimir-orcamento-wrapper {
+    visibility: visible !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 20mm !important; 
+    box-sizing: border-box !important;
+    z-index: 9999999 !important;
+    background: white !important;
+  }
+
+  .imprimir-orcamento-wrapper * {
+    visibility: visible !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}*/
+
+
+
+
+

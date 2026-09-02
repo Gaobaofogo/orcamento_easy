@@ -1,8 +1,8 @@
 import os
+from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from urllib.parse import quote_plus
 
 PG_USER = os.getenv("POSTGRES_USER")
 PG_PASSWORD = quote_plus(os.getenv("POSTGRES_PASSWORD"))

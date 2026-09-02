@@ -1,17 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Orcamento } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Printer, X, FileText, CheckCircle, Clock, AlertTriangle, Building2, Phone, MapPin, Edit2 } from 'lucide-react';
 import { formatPhone, formatCNPJ, formatFullDateWithWeekday, numeroPorExtenso } from '../utils/formatters';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
+import { getOrcamentoFile } from '../services/api';
+
 
 interface OrcamentoPrintViewProps {
+  isOpen: bool;
   orcamento: Orcamento;
   onClose: () => void;
   onStatusChange?: (orcamentoId: string, newStatus: 'Pendente' | 'Aprovado' | 'Recusado' | 'Em Andamento') => void;
 }
 
-export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ orcamento, onClose, onStatusChange }) => {
+export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, orcamento, onClose, onStatusChange }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      console.log("FUi usado")
+      if (e.key === 'Escape') {
+	onClose();
+      }
+
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
   const { user } = useAuth();
 
   // Custom Editable Fields for the Quote document
@@ -30,8 +48,19 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ orcament
     return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const temp_file = await getOrcamentoFile(orcamento.id);
+
+    const url = URL.createObjectURL(temp_file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "Orçamento.pdf";
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
   };
 
   const getStatusBadge = (status?: string) => {
@@ -53,13 +82,22 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ orcament
   // Format Orcamento Number e.g. 120/2026
   const anoOrcamento = orcamento.data ? new Date(orcamento.data).getFullYear() : new Date().getFullYear();
   const numeroFormatado = orcamento.id.startsWith('ORC-') ? `${orcamento.id.replace('ORC-', '')}/${anoOrcamento}` : `${orcamento.id}/${anoOrcamento}`;
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      onClose();
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static">
-      <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden print:border-none print:shadow-none print:bg-white print:text-black print:rounded-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={handleBackdropClick}>
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-slate-900 shadow-2xl border border-slate-800"
+	ref={modalRef}
+      >
         
         {/* Top Control Bar (Hidden on Print) */}
-        <div className="flex flex-wrap items-center justify-between p-4 bg-slate-900 text-white border-b border-slate-800 print:hidden gap-3">
+	<div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900 rounded-t-xl shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-500/20 text-orange-400 rounded-xl border border-orange-500/30">
               <FileText className="w-5 h-5" />
@@ -181,7 +219,7 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ orcament
         )}
 
         {/* PRINTABLE DOCUMENT AREA */}
-        <div className="p-8 sm:p-12 print:p-0 bg-white text-slate-900 font-sans leading-relaxed text-sm">
+        <div className="overflow-y-auto p-8 sm:p-12 print:p-0 bg-white text-slate-900 font-sans leading-relaxed text-sm">
           
           {/* Top Line Separator */}
           <div className="w-full h-1.5 bg-orange-500 mb-6" />
@@ -222,8 +260,8 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ orcament
                 <span className="font-bold text-slate-900 text-sm">{orcamento.cliente?.nome || 'Cliente não informado'}</span>
               </div>
               <div className="p-2.5">
-                <span className="block text-[10px] font-bold text-sky-800 uppercase">Número</span>
-                <span className="font-bold text-slate-900 text-sm">{numeroFormatado}</span>
+                <span className="block text-[10px] font-bold text-sky-800 uppercase">Telefone</span>
+                <span className="font-bold text-slate-900">{formatPhone(orcamento.cliente?.celular)}</span>
               </div>
               <div className="p-2.5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Data da emissão</span>
@@ -232,13 +270,9 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ orcament
             </div>
 
             <div className="grid grid-cols-3 divide-x divide-sky-700/30 bg-white">
-              <div className="p-2.5">
+              <div className="p-2.5 col-span-2">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Endereço</span>
                 <span className="font-bold text-slate-900">{orcamento.cliente?.apelido || 'Caicó – RN'}</span>
-              </div>
-              <div className="p-2.5">
-                <span className="block text-[10px] font-bold text-sky-800 uppercase">Telefone</span>
-                <span className="font-bold text-slate-900">{formatPhone(orcamento.cliente?.celular)}</span>
               </div>
               <div className="p-2.5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Validade da proposta</span>

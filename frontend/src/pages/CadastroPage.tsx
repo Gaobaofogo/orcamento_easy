@@ -180,7 +180,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
                   </div>
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Mínimo 8 caracteres e símbolos"
+                    placeholder="Digite a senha"
                     {...register('senha', {
                       required: 'A senha é obrigatória.',
                       validate: (val) => {

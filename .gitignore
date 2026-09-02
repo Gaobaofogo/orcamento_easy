@@ -4,3 +4,4 @@
 .vscode/
 storage_minio_data/
 postgres_data/
+*~

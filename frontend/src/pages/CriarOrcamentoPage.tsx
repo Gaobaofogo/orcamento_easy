@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchClientes, createOrcamento, updateOrcamento } from '../services/api';
+import { fetchClientes, createOrcamento, updateOrcamento, getAnexoFile } from '../services/api';
 import { Orcamento, ItemOrcamento } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -31,6 +31,7 @@ interface OrcamentoFormInputs {
   status: 'Pendente' | 'Aprovado' | 'Recusado' | 'Em Andamento';
   observacoes: string;
   arquivo?: string;
+  arquivoId?: string;
   arquivoNome?: string;
   introducao?: string;
   materiaPrima?: string;
@@ -71,6 +72,7 @@ export const CriarOrcamentoPage: React.FC<CriarOrcamentoPageProps> = ({
       status: editingOrcamento?.status || 'Pendente',
       observacoes: editingOrcamento?.observacoes || '',
       arquivo: editingOrcamento?.arquivo || '',
+      arquivoId: editingOrcamento?.arquivoId || '',
       arquivoNome: editingOrcamento?.arquivoNome || '',
       introducao: editingOrcamento ? (editingOrcamento.introducao || '') : (user?.introducao || ''),
       materiaPrima: editingOrcamento ? (editingOrcamento.materiaPrima || '') : (user?.materiaPrima || ''),
@@ -98,6 +100,8 @@ export const CriarOrcamentoPage: React.FC<CriarOrcamentoPageProps> = ({
     control,
     name: 'itens'
   });
+let teste = watch('arquivoId');
+console.log(editingOrcamento);
 
   useEffect(() => {
     if (editingOrcamento) {
@@ -108,6 +112,7 @@ export const CriarOrcamentoPage: React.FC<CriarOrcamentoPageProps> = ({
         status: editingOrcamento.status || 'Pendente',
         observacoes: editingOrcamento.observacoes || '',
         arquivo: editingOrcamento.arquivo || '',
+        arquivoId: editingOrcamento.arquivoId || '',
         arquivoNome: editingOrcamento.arquivoNome || '',
         introducao: editingOrcamento.introducao ?? (user?.introducao || ''),
         materiaPrima: editingOrcamento.materiaPrima ?? (user?.materiaPrima || ''),
@@ -196,6 +201,21 @@ export const CriarOrcamentoPage: React.FC<CriarOrcamentoPageProps> = ({
     saveMutation.mutate(data);
   };
 
+  const handleGetAnexoFile = async (file_id: string) => {
+    //const temp_file = await getAnexoFile(file_id + '.' + editingOrcamento.arquivoNome.split('.').pop());
+    const temp_file = await getAnexoFile(file_id);
+
+    const url = URL.createObjectURL(temp_file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = temp_file.name;
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-4 pb-12">
       {/* Top back button */}
@@ -234,7 +254,7 @@ export const CriarOrcamentoPage: React.FC<CriarOrcamentoPageProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" enctype="multipart/form-data">
           {/* Main Info Fields */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Cliente */}
@@ -317,7 +337,7 @@ export const CriarOrcamentoPage: React.FC<CriarOrcamentoPageProps> = ({
               <div className="flex items-center gap-2">
                 {currentOrcamentoArquivoNome ? (
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-orange-700 bg-orange-50 px-2.5 py-1 rounded border border-orange-200 text-xs flex items-center gap-1.5">
+                    <span className={`font-semibold text-orange-700 bg-orange-50 px-2.5 py-1 rounded border border-orange-200 text-xs flex items-center gap-1.5 ${isEditing ? 'underline cursor-pointer' : ''}`} onClick={ isEditing ? () => handleGetAnexoFile(editingOrcamento.arquivoId) : () => {}}>
                       <Paperclip className="w-3.5 h-3.5" />
                       {currentOrcamentoArquivoNome}
                     </span>

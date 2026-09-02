@@ -1,8 +1,12 @@
 import json
+import logging
+from io import BytesIO
 from typing import List, Optional
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, field_validator, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class UserRegister(BaseModel):
@@ -87,6 +91,7 @@ class ClienteCreate(BaseModel):
     celular: str
     email: str
     apelido: Optional[str] = None
+    endereco: Optional[str] = None
 
 
 class ClienteUpdate(BaseModel):
@@ -94,6 +99,7 @@ class ClienteUpdate(BaseModel):
     celular: Optional[str] = None
     email: Optional[str] = None
     apelido: Optional[str] = None
+    endereco: Optional[str] = None
 
 
 class ClienteResponse(BaseModel):
@@ -103,6 +109,7 @@ class ClienteResponse(BaseModel):
     email: str
     apelido: str
     criadoEm: str
+    endereco: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -133,6 +140,7 @@ class OrcamentoCreate(BaseModel):
     status: Optional[str] = "Pendente"
     observacoes: Optional[str] = ""
     arquivo: Optional[UploadFile] = None
+    arquivoId: Optional[str] = ""
     arquivoNome: Optional[str] = ""
     introducao: Optional[str] = ""
     materiaPrima: Optional[str] = ""
@@ -156,18 +164,45 @@ class OrcamentoCreate(BaseModel):
 
         return v
 
+
 class OrcamentoUpdate(BaseModel):
-    cliente_id: Optional[str] = None
-    data: Optional[str] = None
-    dataEntrega: Optional[str] = None
-    status: Optional[str] = None
-    observacoes: Optional[str] = None
-    arquivo: Optional[str] = None
-    arquivoNome: Optional[str] = None
-    introducao: Optional[str] = None
-    materiaPrima: Optional[str] = None
-    formaPagamento: Optional[str] = None
-    itens: Optional[List[ItemOrcamentoCreate]] = None
+    cliente_id: str
+    data: str
+    dataEntrega: Optional[str] = ""
+    status: Optional[str] = "Pendente"
+    observacoes: Optional[str] = ""
+    arquivo: Optional[UploadFile] = None
+    arquivoId: Optional[str] = ""
+    arquivoNome: Optional[str] = ""
+    introducao: Optional[str] = ""
+    materiaPrima: Optional[str] = ""
+    formaPagamento: Optional[str] = ""
+    itens: Optional[List[ItemOrcamentoCreate]] = []
+
+    @field_validator("arquivo", mode="before")
+    @classmethod
+    def parse_arquivo(cls, v):
+        if isinstance(v, str) and len(v) == 0 or v is None:
+            return UploadFile(file=BytesIO())
+
+        return v
+
+    @field_validator("itens", mode="before")
+    @classmethod
+    def parse_itens(cls, v):
+        if isinstance(v, list) and len(v) == 1 and isinstance(v[0], str):
+            try:
+                return json.loads(v[0])
+            except Exception:
+                return []
+
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except:
+                return []
+
+        return v
 
 
 class OrcamentoResponse(BaseModel):
@@ -178,6 +213,7 @@ class OrcamentoResponse(BaseModel):
     status: str
     observacoes: Optional[str] = ""
     arquivo: Optional[str] = ""
+    arquivoId: Optional[str] = ""
     arquivoNome: Optional[str] = ""
     introducao: Optional[str] = ""
     materiaPrima: Optional[str] = ""

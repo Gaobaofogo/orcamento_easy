@@ -150,6 +150,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   const handleEditOrcamento = (o: Orcamento) => {
+    console.log("orcamento", o);
     setEditingOrcamento(o);
     navigate('/dashboard/criar-orçamento');
   };
@@ -184,7 +185,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner / Hero Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="print:hidden flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Painel Gerencial de Orçamentos
@@ -694,6 +695,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Modal View for Budget */}
       {viewingOrcamento && (
         <OrcamentoPrintView
+	  isOpen={viewingOrcamento}
           orcamento={viewingOrcamento}
           onClose={() => setViewingOrcamento(null)}
           onStatusChange={(id, status) => updateStatusMutation.mutate({ id, status })}
