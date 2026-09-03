@@ -204,11 +204,12 @@ console.log(editingOrcamento);
   const handleGetAnexoFile = async (file_id: string) => {
     //const temp_file = await getAnexoFile(file_id + '.' + editingOrcamento.arquivoNome.split('.').pop());
     const temp_file = await getAnexoFile(file_id);
+    console.log(file_id);
 
     const url = URL.createObjectURL(temp_file);
     const a = document.createElement('a');
     a.href = url;
-    a.download = temp_file.name;
+    a.download = editingOrcamento.arquivoNome;
     document.body.appendChild(a);
     a.click();
 
@@ -331,7 +332,7 @@ console.log(editingOrcamento);
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <Paperclip className="w-4 h-4 text-orange-600" />
-              Anexo Geral do Orçamento (Documento / Planta / Laudo)
+              Anexo Geral do Orçamento (Documento / Planta / Projeto)
             </label>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-2">

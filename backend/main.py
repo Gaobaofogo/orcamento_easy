@@ -53,9 +53,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+import sys
+import traceback
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    print(f"❌ ERRO CRÍTICO NA ROTA {request.url.path}:", file=sys.stderr)
+    traceback.print_exc()
+    if isinstance(exc.detail, dict):
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
     if isinstance(exc.detail, dict):
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)})
@@ -640,17 +645,21 @@ async def upload_file(
 #     return storage_manager.list_files()
 
 
+import mimetypes
 @app.get("/api/files/{file_id}")
 def get_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
 ):
     try:
-        file_bytes, filename, content_type = storage_manager.get_file(file_id)
+        file_content: bytes = storage_manager.get_file(file_id)
+        content_type, _ = mimetypes.guess_type(file_id)
+        if not content_type:
+            content_type = "application/octet-stream"
         return Response(
-            content=file_bytes,
+            content=file_content,
             media_type=content_type,
-            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+            headers={"Content-Disposition": f'inline; filename="{file_id}"'},
         )
     except KeyError:
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.")

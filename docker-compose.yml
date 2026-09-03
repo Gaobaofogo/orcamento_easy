@@ -81,6 +81,8 @@ services:
         condition: service_healthy
       storage:
         condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
     volumes:
       - backend_uploads:/app/uploads
       - ./backend:/app/backend
@@ -148,6 +150,7 @@ services:
       - VITE_API_URL=http://backend-dev:8000
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend-dev
   ##### END DEVELOPMENT #####

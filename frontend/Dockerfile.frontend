@@ -10,8 +10,6 @@ COPY . .
 
 FROM base AS dev
 
-RUN npm install -g typescript typescript-language-server
-
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
