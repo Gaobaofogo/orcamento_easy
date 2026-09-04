@@ -805,31 +805,64 @@ def get_actual_data_de_emissao():
 
 
 import re
-from html import unescape
-
+from bs4 import BeautifulSoup, Comment
 
 def limpar_html_para_reportlab(texto_html: str) -> str:
+    """
+    Higieniza e converte HTML vindo do RichText/WYSIWYG para o subconjunto de 
+    XML estritamente aceito pelo ReportLab (Paragraph).
+    """
     if not texto_html:
         return ""
 
-    # 1. Substitui quebras de linha/divs por quebras <br/>
+    # 1. Pré-processamento com regex para normalizar quebras de divs do editor
     texto = re.sub(r"</div>\s*<div>", "<br/>", texto_html, flags=re.IGNORECASE)
-    texto = re.sub(r"<br\s*/?>", "<br/>", texto, flags=re.IGNORECASE)
+    
+    # Parse com BeautifulSoup
+    soup = BeautifulSoup(texto, "html.parser")
 
-    # 2. Remove tags não suportadas pelo ReportLab (div, p, span, etc.)
-    # Mantenha apenas tags aceitas: b, i, u, font, super, sub, strike, a
-    tags_permitidas = ["b", "i", "u", "font", "a", "br"]
+    # 2. Remove comentários HTML
+    for comment in soup.find_all(text=lambda text: isinstance(text, Comment)):
+        comment.extract()
 
-    # Remove divs e p mas mantendo o conteúdo interno
-    texto = re.sub(r"</?(?:div|p|span)[^>]*>", "", texto, flags=re.IGNORECASE)
+    # 3. Trata blocos p/div convertendo em quebras para o ReportLab
+    for tag in soup.find_all(["p", "div"]):
+        tag.insert_after(soup.new_tag("br"))
+        tag.unwrap()
 
-    # 3. Garante que qualquer <br> sem fechamento seja <br/>
-    texto = re.sub(r"<br(?!\s*/\s*>)", "<br/>", texto, flags=re.IGNORECASE)
+    # 4. Tags e atributos estritamente permitidos pelo ReportLab
+    allowed_tags = {"b", "strong", "i", "em", "u", "font", "a", "sub", "sup", "br", "strike", "ul", "ol", "li"}
 
-    # 4. Remove tags malformadas ou vazias tipo <br></br>
-    texto = re.sub(r"<br\s*>\s*</br\s*>", "<br/>", texto, flags=re.IGNORECASE)
+    for tag in soup.find_all(True):
+        if tag.name not in allowed_tags:
+            # Desembrulha (remove a tag e mantém o texto) tags não suportadas (ex: span, h1-h6)
+            tag.unwrap()
+        else:
+            # Normaliza equivalências
+            if tag.name == "strong":
+                tag.name = "b"
+            elif tag.name == "em":
+                tag.name = "i"
 
-    return texto.strip()
+            # REMOVE o atributo 'class' e outros incompatíveis (como 'style', 'id')
+            # Preserva apenas atributos explicitamente suportados pelo ReportLab
+            attrs = dict(tag.attrs)
+            for attr in attrs:
+                if tag.name == "font" and attr in ["color", "face", "size"]:
+                    continue
+                if tag.name == "a" and attr in ["href"]:
+                    continue
+                del tag[attr]
+
+    # Renderiza o HTML higienizado
+    texto_limpo = str(soup)
+
+    # 5. Pós-processamento com regex para garantir auto-fechamento <br/> do XML do ReportLab
+    texto_limpo = re.sub(r"<br\s*/?>", "<br/>", texto_limpo, flags=re.IGNORECASE)
+    texto_limpo = re.sub(r"^(<br\s*/?>)+|(<br\s*/?>)+$", "", texto_limpo.strip(), flags=re.IGNORECASE)
+
+    return texto_limpo
+
 
 
 from num2words import num2words
