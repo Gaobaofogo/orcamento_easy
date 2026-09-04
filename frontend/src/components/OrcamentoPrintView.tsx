@@ -124,7 +124,7 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs shadow-md transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               Imprimir / PDF
@@ -144,15 +144,15 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
         {onStatusChange && (
           <div className="p-3 bg-slate-800 border-b border-slate-700 print:hidden flex items-center justify-between text-xs text-slate-300">
             <span>Alterar Status do Orçamento:</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 text-sla">
               {(['Pendente', 'Em Andamento', 'Aprovado', 'Recusado'] as const).map((st) => (
                 <button
                   key={st}
                   onClick={() => onStatusChange(orcamento.id, st)}
                   className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                     orcamento.status === st
-                      ? 'bg-orange-400 text-slate-950 shadow-sm'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      ? 'bg-orange-400 text-slate-100 shadow-sm'
+                      : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
                   }`}
                 >
                   {st}
@@ -220,9 +220,6 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
 
         {/* PRINTABLE DOCUMENT AREA */}
         <div className="overflow-y-auto p-8 sm:p-12 print:p-0 bg-white text-slate-900 font-sans leading-relaxed text-sm">
-          
-          {/* Top Line Separator */}
-          <div className="w-full h-1.5 bg-orange-500 mb-6" />
 
           {/* 1. LOGOMARCA & LOGO BANNER */}
           <div className="text-center mb-6">
@@ -254,16 +251,16 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
 
           {/* 3, 4, 5, 6, 7. DADOS DO CLIENTE E DO ORÇAMENTO (QUADRO COM BORDA AZUL) */}
           <div className="border border-sky-700/40 rounded-none mb-6 overflow-hidden text-xs">
-            <div className="grid grid-cols-3 divide-x divide-sky-700/30 border-b border-sky-700/30 bg-white">
-              <div className="p-2.5">
+            <div className="grid grid-cols-12 divide-x divide-sky-700/30 border-b border-sky-700/30 bg-white">
+              <div className="p-2.5 col-span-5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Cliente / Contratante</span>
                 <span className="font-bold text-slate-900 text-sm">{orcamento.cliente?.nome || 'Cliente não informado'}</span>
               </div>
-              <div className="p-2.5">
+              <div className="p-2.5 col-span-2">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Telefone</span>
                 <span className="font-bold text-slate-900">{formatPhone(orcamento.cliente?.celular)}</span>
               </div>
-              <div className="p-2.5">
+              <div className="p-2.5 col-span-5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Data da emissão</span>
                 <span className="font-bold text-slate-900">{formatFullDateWithWeekday(orcamento.data)}</span>
               </div>
@@ -272,7 +269,7 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
             <div className="grid grid-cols-3 divide-x divide-sky-700/30 bg-white">
               <div className="p-2.5 col-span-2">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Endereço</span>
-                <span className="font-bold text-slate-900">{orcamento.cliente?.apelido || 'Caicó – RN'}</span>
+                <span className="font-bold text-slate-900">{orcamento.cliente?.endereco || 'Caicó – RN'}</span>
               </div>
               <div className="p-2.5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Validade da proposta</span>
@@ -392,7 +389,7 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
           {/* 13. FORMAS DE PAGAMENTO */}
           <div className="mb-6 space-y-1 text-xs">
             <h3 className="font-bold text-sky-900 uppercase tracking-wider mb-1.5">
-              FORMAS DE PAGAMENTO
+              FORMAS DE PAGAMENTO / PRAZO
             </h3>
             {orcamento.formaPagamento || user?.formaPagamento ? (
               <div
@@ -413,19 +410,6 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
                 </li>
               </ul>
             )}
-          </div>
-
-          {/* 14. PRAZO DE ENTREGA */}
-          <div className="mb-8 space-y-1 text-xs">
-            <h3 className="font-bold text-sky-900 uppercase tracking-wider mb-1.5">
-              PRAZO DE ENTREGA
-            </h3>
-            <ul className="space-y-1 text-slate-800 pl-1">
-              <li className="flex items-start gap-2">
-                <span className="text-slate-900 font-bold">▪</span>
-                <span>{prazoEntrega}</span>
-              </li>
-            </ul>
           </div>
 
           {/* Closing Text & 15. ASSINATURAS */}

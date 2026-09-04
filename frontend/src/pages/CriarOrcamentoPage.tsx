@@ -568,7 +568,7 @@ console.log(editingOrcamento);
               <button
                 type="submit"
                 disabled={saveMutation.isPending}
-                className="px-5 py-2 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {saveMutation.isPending ? (
                   <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />

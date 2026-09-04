@@ -63,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
               onClick={() => navigate('/dashboard/criar-orçamento')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 currentPath === '/dashboard/criar-orçamento' || currentPath === '/dashboard/criar-orcamento'
-                  ? 'bg-orange-400 text-slate-950 font-bold shadow-sm hover:bg-orange-500'
+                  ? 'bg-orange-400 text-slate-200 font-bold shadow-sm hover:bg-orange-500'
                   : 'bg-orange-400/20 text-orange-300 border border-orange-400/30 hover:bg-orange-400/30'
               }`}
             >

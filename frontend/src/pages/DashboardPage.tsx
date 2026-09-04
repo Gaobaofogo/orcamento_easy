@@ -205,7 +205,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </button>
           <button
             onClick={() => handleCreateNewOrcamento()}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs shadow-sm transition-all cursor-pointer"
           >
             <FilePlus className="w-4 h-4" />
             + Criar Orçamento
@@ -309,8 +309,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               onClick={() => setActiveTab('orcamentos')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'orcamentos'
-                  ? 'bg-orange-400 text-slate-950 font-bold shadow-sm'
-                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                  ? 'bg-orange-400 text-slate-100 font-bold shadow-sm'
+                  : 'bg-white text-slate-200 hover:bg-slate-50 border border-slate-200'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -321,7 +321,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               onClick={() => setActiveTab('clientes')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'clientes'
-                  ? 'bg-orange-400 text-slate-950 font-bold shadow-sm'
+                  ? 'bg-orange-400 text-slate-100 font-bold shadow-sm'
                   : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
