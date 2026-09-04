@@ -427,7 +427,7 @@ export const MeuPerfilPage: React.FC<MeuPerfilPageProps> = ({ navigate, addToast
           <button
             type="submit"
             disabled={savingProfile}
-            className="px-5 py-2 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs shadow-sm flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+            className="px-5 py-2 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs shadow-sm flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
           >
             {savingProfile ? (
               <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-950 border-t-transparent" />

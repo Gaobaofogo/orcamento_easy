@@ -310,7 +310,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'orcamentos'
                   ? 'bg-orange-400 text-slate-100 font-bold shadow-sm'
-                  : 'bg-white text-slate-200 hover:bg-slate-50 border border-slate-200'
+                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />

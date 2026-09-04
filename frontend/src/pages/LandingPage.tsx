@@ -43,7 +43,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
             {isAuthenticated ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-slate-200 font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 <span>Olá, {user?.nome?.split(' ')[0] || 'Marceneiro'}! Ir ao Painel</span>
@@ -94,7 +94,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
             {isAuthenticated ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer group"
+                className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-200 font-black text-base rounded-2xl shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer group"
               >
                 <span>Acessar Meu Painel de Orçamentos</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -200,7 +200,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
             {isAuthenticated ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-950 font-black rounded-2xl shadow-xl shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                className="px-8 py-4 bg-orange-500 hover:bg-orange-400 text-slate-200 font-black rounded-2xl shadow-xl shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <span>Acessar o Painel Agora</span>
                 <ChevronRight className="w-5 h-5" />

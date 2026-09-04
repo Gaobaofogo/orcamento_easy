@@ -36,7 +36,7 @@ export const LogoutPage: React.FC<LogoutPageProps> = ({ navigate, addToast }) =>
 
         <button
           onClick={() => navigate('/login')}
-          className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all"
+          className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-200 font-bold rounded-xl text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all"
         >
           Voltar para a tela de Login
           <ArrowRight className="w-4 h-4" />
