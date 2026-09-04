@@ -891,7 +891,7 @@ async def gerar_pdf_orcamento(
         "valor_extenso": num2words(
             orcamento.valor_total, lang="pt_BR", to="currency"
         ).capitalize(),
-        "pagamento": orcamento.formaPagamento,
+        "pagamento": limpar_html_para_reportlab(orcamento.formaPagamento),
         "prazo": "O prazo será à combinar.",
         "empresa_endereco": current_user.endereco,
     }
