@@ -141,7 +141,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ navigate, addToast }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-2 cursor-pointer"
+              className="w-full py-2.5 px-4 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-2 cursor-pointer"
             >
               {loading ? (
                 <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
