@@ -90,8 +90,6 @@ export async function logoutApi(): Promise<{ message: string }> {
 export async function updateUserProfileApi(userData: Partial<User>): Promise<User> {
   const res = await apiFetch('/api/user/profile', {
     method: 'PUT',
-    headers: getAuthHeaders(),
-    credentials: 'include',
     body: JSON.stringify(userData)
   });
 
@@ -169,10 +167,8 @@ export async function createCliente(clienteData: Partial<Cliente>): Promise<Clie
 }
 
 export async function updateCliente(id: string, clienteData: Partial<Cliente>): Promise<Cliente> {
-  const res = await fetch(`/api/clientes/${id}`, {
+  const res = await apiFetch(`/api/clientes/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
-    credentials: 'include',
     body: JSON.stringify(clienteData)
   });
   const data = await res.json();
@@ -251,10 +247,6 @@ export async function createOrcamento(orcamentoData: Record<string, any>): Promi
     }
   });
 
-  const headers = new Headers(getAuthHeaders());
-  headers.delete('Content-Type');
-  headers.delete('content-type');
-
   const res = await apiFetch('/api/orcamentos', {
     method: 'POST',
     body: formData
@@ -290,10 +282,6 @@ export async function updateOrcamento(id: string, orcamentoData: any): Promise<O
       }
     }
   });
-
-  const headers = new Headers(getAuthHeaders());
-  headers.delete('Content-Type');
-  headers.delete('content-type');
 
   const res = await apiFetch(`/api/orcamentos/${id}`, {
     method: 'PUT',
