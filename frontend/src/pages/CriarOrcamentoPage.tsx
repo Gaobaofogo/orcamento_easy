@@ -5,10 +5,12 @@ import { fetchClientes, createOrcamento, updateOrcamento, getAnexoFile } from '.
 import { Orcamento, ItemOrcamento } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { ClienteAutoCompleteField } from '../components/ClienteAutoCompleteField';
 import {
   FileText, User, Calendar, Plus, Trash2, ArrowLeft, Save, MapPin, DollarSign,
   Upload, Paperclip, CheckCircle2, Clock, FilePlus, AlertCircle, FileCode2
 } from 'lucide-react';
+import { Controller } from 'react-hook-form';
 
 interface CriarOrcamentoPageProps {
   editingOrcamento: Orcamento | null;
@@ -258,29 +260,29 @@ console.log(editingOrcamento);
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" enctype="multipart/form-data">
           {/* Main Info Fields */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Cliente */}
-            <div className="space-y-1 md:col-span-1">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                Cliente <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  {...register('cliente_id', { required: 'Selecione um cliente para o orçamento.' })}
-                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none cursor-pointer"
-                >
-                  <option value="">Selecione o Cliente...</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome} {c.apelido ? `(${c.apelido})` : ''}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
-                </div>
-              </div>
-              {errors.cliente_id && <p className="text-xs text-rose-600">{errors.cliente_id.message}</p>}
-            </div>
+	    <div className="space-y-1 md:col-span-1">
+		<label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+		    Cliente <span className="text-rose-500">*</span>
+		</label>
+
+		<Controller
+		    name="cliente_id"
+		    control={control} // Adicione o 'control' vindo do useForm()
+		    rules={{ required: 'Selecione um cliente para o orçamento.' }}
+		    render={({ field }) => (
+		    <ClienteAutoCompleteField
+			clientes={clientes}
+			value={field.value}
+			onChange={field.onChange}
+			error={errors.cliente_id?.message}
+		    />
+		    )}
+		/>
+
+		{errors.cliente_id && (
+		    <p className="text-xs text-rose-600">{errors.cliente_id.message}</p>
+		)}
+	    </div>
 
             {/* Data do Orçamento */}
             <div className="space-y-1">

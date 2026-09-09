@@ -27,6 +27,7 @@ from auth import (
     JWT_SECRET,
     check_password,
     create_access_token,
+    decode_token,
     generate_password,
     get_current_user,
 )
@@ -55,10 +56,12 @@ app.add_middleware(
 
 import sys
 import traceback
+
+
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     print(f"❌ ERRO CRÍTICO NA ROTA {request.url.path}:", file=sys.stderr)
-    traceback.print_exc()
+    # traceback.print_exc()
     if isinstance(exc.detail, dict):
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     if isinstance(exc.detail, dict):
@@ -142,7 +145,8 @@ def login_user(
     if not user or not check_password(payload.senha, str(user.senha)):
         raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
 
-    token = create_access_token({"id": user.id, "email": user.email, "nome": user.nome})
+    token = create_access_token(data={"id": user.id, "email": user.email, "nome": user.nome}, expires_delta=datetime.timedelta(minutes=30))
+    refresh_token = create_access_token(data={"id": user.id, "type": "refresh"}, expires_delta=datetime.timedelta(days=7))
 
     # Armazena o token em cookie HttpOnly com SameSite=Strict
     response.set_cookie(
@@ -150,12 +154,66 @@ def login_user(
         value=token,
         httponly=True,
         samesite="strict",
-        secure=False,
-        max_age=43200,
+        secure=False if IS_DEVELOPMENT_ENV else True,
+        max_age=1800,
         path="/",
     )
 
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="strict",
+        secure=False if IS_DEVELOPMENT_ENV else True,
+        max_age=604800,
+        path="/api/auth/refresh",
+    )
+
     return {"token": token, "user": user}
+from fastapi import Request
+
+@app.post("/api/auth/refresh")
+def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
+    # 1. Busca o refresh_token enviado no cookie
+    token_cookie = request.cookies.get("refresh_token")
+    if not token_cookie:
+        raise HTTPException(status_code=401, detail="Refresh token ausente.")
+
+    try:
+        # 2. Decodifica o token de refresh (sua função de decodificar JWT)
+        payload = decode_token(token_cookie)
+        
+        # Garante que o token é do tipo 'refresh' e não um access token reaproveitado
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Token inválido para renovação.")
+            
+        user_id = payload.get("id")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Refresh token expirado ou inválido.")
+
+    # 3. Busca o usuário no banco para garantir que ainda existe/está ativo
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+
+    # 4. Gera um NOVO access_token
+    new_access_token = create_access_token(
+        data={"id": user.id, "email": user.email, "nome": user.nome, "type": "access"},
+        expires_delta=datetime.timedelta(minutes=30)
+    )
+
+    # 5. Atualiza o cookie do access_token no navegador
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        samesite="strict",
+        secure=False if IS_DEVELOPMENT_ENV else True,
+        max_age=1800,
+        path="/",
+    )
+
+    return {"token": new_access_token, "user": user}
 
 
 @app.get("/api/auth/me", response_model=schemas.UserResponse)
@@ -166,6 +224,7 @@ def get_me(current_user: User = Depends(get_current_user)):
 @app.post("/api/auth/logout")
 def logout_user(response: Response):
     response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/api/auth/refresh")
     return {"message": "Logout realizado com sucesso!"}
 
 
@@ -323,8 +382,7 @@ def get_me(current_user: User = Depends(get_current_user)):
 def get_clientes(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    start_op = time.time()
-    clientes = db.query(Cliente).all()
+    clientes = db.query(Cliente).filter(Cliente.user_id == current_user.id).all()
     return clientes
 
 
@@ -435,8 +493,9 @@ def _build_orcamento_response(orc: Orcamento) -> dict:
 def get_orcamentos(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    start_op = time.time()
-    orcamentos = db.query(Orcamento).all()
+    orcamentos = (
+        db.query(Orcamento).join(Cliente, Orcamento.cliente_id == Cliente.id).filter(Cliente.user_id == current_user.id).all()
+    )
     return [_build_orcamento_response(o) for o in orcamentos]
 
 
@@ -646,6 +705,8 @@ async def upload_file(
 
 
 import mimetypes
+
+
 @app.get("/api/files/{file_id}")
 def get_file(
     file_id: str,
@@ -667,133 +728,156 @@ def get_file(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+import re
 from io import BytesIO
 
+from bs4 import BeautifulSoup, Comment
 from fastapi import FastAPI, HTTPException, Response
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import (
-    SimpleDocTemplate,
+    HRFlowable,
+    KeepTogether,
     Paragraph,
+    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
-    HRFlowable,
-    KeepTogether
 )
+
 # Definição das Cores do Layout
-COR_ORANGE = colors.HexColor("#F97316")
-COR_TEXTO_DARK = colors.HexColor("#1E293B")
-COR_AZUL_HDR = colors.HexColor("#0284C7")
-COR_BG_TABELA = colors.HexColor("#F0F9FF")
-COR_BORDA = colors.HexColor("#BAE6FD")
+
 
 def criar_estilos():
     styles = getSampleStyleSheet()
-    
-    styles.add(ParagraphStyle(
-        'HeaderEmpresa',
-        fontName='Helvetica-Bold',
-        fontSize=16,
-        leading=18,
-        alignment=TA_CENTER,
-        textColor=COR_ORANGE_DARK
-    ))
-    
-    styles.add(ParagraphStyle(
-        'SubHeaderEmpresa',
-        fontName='Helvetica-Bold',
-        fontSize=7.5,
-        leading=10,
-        alignment=TA_CENTER,
-        textColor=COR_TEXTO_MUTED
-    ))
 
-    styles.add(ParagraphStyle(
-        'TituloDocumento',
-        fontName='Helvetica-Bold',
-        fontSize=12,
-        leading=15,
-        alignment=TA_CENTER,
-        textColor=COR_TEXTO_MUTED
-    ))
+    styles.add(
+        ParagraphStyle(
+            "HeaderEmpresa",
+            fontName="Helvetica-Bold",
+            fontSize=16,
+            leading=18,
+            alignment=TA_CENTER,
+            textColor=COR_ORANGE_DARK,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'SecaoTitulo',
-        fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
-        textColor=COR_AZUL_HDR,
-        spaceBefore=6,
-        spaceAfter=4
-    ))
+    styles.add(
+        ParagraphStyle(
+            "SubHeaderEmpresa",
+            fontName="Helvetica-Bold",
+            fontSize=7.5,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=COR_TEXTO_MUTED,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'TextoCorpo',
-        fontName='Helvetica',
-        fontSize=8.5,
-        leading=12,
-        alignment=TA_JUSTIFY,
-        textColor=COR_TEXTO_DARK
-    ))
+    styles.add(
+        ParagraphStyle(
+            "TituloDocumento",
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=15,
+            alignment=TA_CENTER,
+            textColor=COR_TEXTO_MUTED,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'GridLabel',
-        fontName='Helvetica-Bold',
-        fontSize=6.5,
-        leading=8,
-        textColor=COR_AZUL_HDR
-    ))
+    styles.add(
+        ParagraphStyle(
+            "SecaoTitulo",
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+            textColor=COR_AZUL_HDR,
+            spaceBefore=6,
+            spaceAfter=4,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'GridValue',
-        fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
-        textColor=COR_TEXTO_DARK
-    ))
+    styles.add(
+        ParagraphStyle(
+            "TextoCorpo",
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=12,
+            alignment=TA_JUSTIFY,
+            textColor=COR_TEXTO_DARK,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'TableHead',
-        fontName='Helvetica-Bold',
-        fontSize=7,
-        leading=9,
-        textColor=COR_AZUL_HDR
-    ))
+    styles.add(
+        ParagraphStyle(
+            "GridLabel",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            leading=8,
+            textColor=COR_AZUL_HDR,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'TextoLegal',
-        fontName='Helvetica-Oblique',
-        fontSize=7.5,
-        leading=10,
-        alignment=TA_CENTER,
-        textColor=COR_TEXTO_MUTED
-    ))
+    styles.add(
+        ParagraphStyle(
+            "GridValue",
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+            textColor=COR_TEXTO_DARK,
+        )
+    )
 
-    styles.add(ParagraphStyle(
-        'Rodape',
-        fontName='Helvetica-Bold',
-        fontSize=8,
-        leading=10,
-        alignment=TA_CENTER,
-        textColor=COR_ORANGE_DARK
-    ))
+    styles.add(
+        ParagraphStyle(
+            "TableHead",
+            fontName="Helvetica-Bold",
+            fontSize=7,
+            leading=9,
+            textColor=COR_AZUL_HDR,
+        )
+    )
+
+    styles.add(
+        ParagraphStyle(
+            "TextoLegal",
+            fontName="Helvetica-Oblique",
+            fontSize=7.5,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=COR_TEXTO_MUTED,
+        )
+    )
+
+    styles.add(
+        ParagraphStyle(
+            "Rodape",
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=COR_ORANGE_DARK,
+        )
+    )
 
     return styles
+
+
 def format_currency(value: float) -> str:
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-COR_ORANGE = colors.HexColor('#F97316')       # orange-500
-COR_ORANGE_DARK = colors.HexColor('#EA580C')  # orange-600
-COR_TEXTO_DARK = colors.HexColor('#0F172A')   # slate-900
-COR_TEXTO_MUTED = colors.HexColor('#475569')  # slate-600
-COR_AZUL_HDR = colors.HexColor('#075985')     # sky-800 / sky-900
-COR_BG_TABELA = colors.HexColor('#F0F9FF')    # sky-50
-COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparênci
+
+
+COR_ORANGE = colors.HexColor("#F97316")  # orange-500
+COR_ORANGE_DARK = colors.HexColor("#EA580C")  # orange-600
+COR_TEXTO_DARK = colors.HexColor("#0F172A")  # slate-900
+COR_TEXTO_MUTED = colors.HexColor("#475569")  # slate-600
+COR_AZUL_HDR = colors.HexColor("#075985")  # sky-800 / sky-900
+COR_BG_TABELA = colors.HexColor("#F0F9FF")  # sky-50
+COR_BORDA_AZUL = colors.HexColor("#7DD3FC")  # sky-300 / sky-700 com transparênci
 # def criar_estilos():
 #     styles = getSampleStyleSheet()
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "TituloPrincipal",
@@ -804,7 +888,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             textColor=COR_TEXTO_DARK,
 #         )
 #     )
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "SecaoTitulo",
@@ -816,7 +900,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             spaceAfter=4,
 #         )
 #     )
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "TextoCorpo",
@@ -826,7 +910,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             textColor=COR_TEXTO_DARK,
 #         )
 #     )
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "CellLabel",
@@ -836,7 +920,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             textColor=COR_AZUL_HDR,
 #         )
 #     )
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "CellValue",
@@ -846,7 +930,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             textColor=COR_TEXTO_DARK,
 #         )
 #     )
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "RodapeEnd",
@@ -856,7 +940,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             textColor=COR_ORANGE,
 #         )
 #     )
-# 
+#
 #     styles.add(
 #         ParagraphStyle(
 #             "TextoLegal",
@@ -866,7 +950,7 @@ COR_BORDA_AZUL = colors.HexColor('#7DD3FC')   # sky-300 / sky-700 com transparê
 #             textColor=colors.HexColor("#64748B"),
 #         )
 #     )
-# 
+#
 #     return styles
 
 
@@ -904,12 +988,9 @@ def get_actual_data_de_emissao():
     return f"{dia_semana}, {agora.day} de {mes} de {agora.year} às {agora.strftime('%H:%M')}"
 
 
-import re
-from bs4 import BeautifulSoup, Comment
-
 def limpar_html_para_reportlab(texto_html: str) -> str:
     """
-    Higieniza e converte HTML vindo do RichText/WYSIWYG para o subconjunto de 
+    Higieniza e converte HTML vindo do RichText/WYSIWYG para o subconjunto de
     XML estritamente aceito pelo ReportLab (Paragraph).
     """
     if not texto_html:
@@ -917,7 +998,7 @@ def limpar_html_para_reportlab(texto_html: str) -> str:
 
     # 1. Pré-processamento com regex para normalizar quebras de divs do editor
     texto = re.sub(r"</div>\s*<div>", "<br/>", texto_html, flags=re.IGNORECASE)
-    
+
     # Parse com BeautifulSoup
     soup = BeautifulSoup(texto, "html.parser")
 
@@ -931,7 +1012,22 @@ def limpar_html_para_reportlab(texto_html: str) -> str:
         tag.unwrap()
 
     # 4. Tags e atributos estritamente permitidos pelo ReportLab
-    allowed_tags = {"b", "strong", "i", "em", "u", "font", "a", "sub", "sup", "br", "strike", "ul", "ol", "li"}
+    allowed_tags = {
+        "b",
+        "strong",
+        "i",
+        "em",
+        "u",
+        "font",
+        "a",
+        "sub",
+        "sup",
+        "br",
+        "strike",
+        "ul",
+        "ol",
+        "li",
+    }
 
     for tag in soup.find_all(True):
         if tag.name not in allowed_tags:
@@ -959,12 +1055,67 @@ def limpar_html_para_reportlab(texto_html: str) -> str:
 
     # 5. Pós-processamento com regex para garantir auto-fechamento <br/> do XML do ReportLab
     texto_limpo = re.sub(r"<br\s*/?>", "<br/>", texto_limpo, flags=re.IGNORECASE)
-    texto_limpo = re.sub(r"^(<br\s*/?>)+|(<br\s*/?>)+$", "", texto_limpo.strip(), flags=re.IGNORECASE)
+    texto_limpo = re.sub(
+        r"^(<br\s*/?>)+|(<br\s*/?>)+$", "", texto_limpo.strip(), flags=re.IGNORECASE
+    )
 
     return texto_limpo
 
+def html_para_flowables(html_limpo: str, style_corpo, style_lista=None) -> list:
+    """
+    Recebe um HTML/XML limpo e o converte em uma lista de Flowables (Paragraphs)
+    para o ReportLab, garantindo que listas <ul>/<li> e parágrafos sejam
+    renderizados em linhas separadas.
+    """
+    if not html_limpo:
+        return []
 
+    if style_lista is None:
+        style_lista = style_corpo
 
+    soup = BeautifulSoup(html_limpo, "html.parser")
+    flowables = []
+
+    for elemento in soup.contents:
+        # Se for um nó de texto puro
+        if isinstance(elemento, str):
+            texto = elemento.strip()
+            if texto:
+                flowables.append(Paragraph(texto, style_corpo))
+            continue
+
+        # Se for uma lista <ul> ou <ol>
+        if elemento.name in ["ul", "ol"]:
+            for li in elemento.find_all("li", recursive=False):
+                # Extrai o HTML interno do item para preservar tags como <b> ou <i>
+                conteudo_li = "".join(str(c) for c in li.contents).strip()
+                conteudo_limpo = re.sub(
+                                    r'^[\s\u25a0\u25a1\u25aa\u25ab\u2022\u2023\u2043\u204f\u2212\-\*&nbsp;]+', 
+                                    '', 
+                                    conteudo_li
+                                ).strip()
+                if conteudo_li:
+                    # Injeta um marcador (bullet) seguro no início de cada item
+                    texto_item = f"&bull; {conteudo_limpo}"
+                    flowables.append(Paragraph(texto_item, style_lista))
+            
+        # Se for um bloco de parágrafo <p> ou <div>
+        elif elemento.name in ["p", "div"]:
+            conteudo_p = "".join(str(c) for c in elemento.contents).strip()
+            if conteudo_p:
+                flowables.append(Paragraph(conteudo_p, style_corpo))
+
+        # Outras tags inline soltas
+        else:
+            conteudo = str(elemento).strip()
+            if conteudo:
+                flowables.append(Paragraph(conteudo, style_corpo))
+
+    return flowables
+
+from reportlab.platypus import Image, Spacer, HRFlowable
+from reportlab.lib import colors
+import base64
 from num2words import num2words
 
 @app.get("/api/orcamentos/{orcamento_id}/pdf")
@@ -980,7 +1131,7 @@ async def gerar_pdf_orcamento(
         leftMargin=30,
         rightMargin=30,
         topMargin=25,
-        bottomMargin=25
+        bottomMargin=25,
     )
 
     story = []
@@ -991,37 +1142,61 @@ async def gerar_pdf_orcamento(
     # --- 1. LOGOMARCA / NOME DA EMPRESA ---
     nome_empresa = (
         current_user.nomeFantasia or current_user.razaoSocial or "MARCENARIA"
-        if current_user else "MARCENARIA"
+        if current_user
+        else "MARCENARIA"
     ).upper()
 
+    logomarca_b64 = str(current_user.logomarca)
+    # missing_padding = len(str(logomarca_b64)) % 4
+    # if missing_padding:
+    #     logomarca_b64 += '=' * (4 - missing_padding)
+    # img_logo = Image(BytesIO(base64.b64decode(logomarca_b64)), width=250, height=250)
+    if "," in logomarca_b64:
+        logomarca_b64 = logomarca_b64.split(",")[1]
+    img_logo = Image(BytesIO(base64.b64decode(logomarca_b64)), width=100, height=100)
+    img_logo.hAlign = 'CENTER'
     tbl_logo_content = [
-        [Paragraph(f"<b>{nome_empresa}</b>", styles['HeaderEmpresa'])],
+        #[Paragraph(f"<b>{nome_empresa}</b>", styles["HeaderEmpresa"])],
+        [img_logo]
     ]
     tbl_logo = Table(tbl_logo_content, colWidths=[240])
-    tbl_logo.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1.5, COR_TEXTO_DARK),
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-    ]))
+    tbl_logo.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 1.5, colors.HexColor("#FFFFFF")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFFFFF")),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
 
-    tbl_wrapper = Table([
-        [tbl_logo],
-        [Paragraph("MÓVEIS PROJETADOS EM GERAL", styles['SubHeaderEmpresa'])]
-    ], colWidths=[535])
-    tbl_wrapper.setStyle(TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2)
-    ]))
+    tbl_wrapper = Table(
+        [
+            [tbl_logo],
+            [Paragraph(current_user.razaoSocial, styles["SubHeaderEmpresa"])],
+        ],
+        colWidths=[535],
+    )
+    tbl_wrapper.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
     story.append(tbl_wrapper)
     story.append(Spacer(1, 8))
 
     # Linha Laranja Sob o Logo
-    story.append(HRFlowable(width="100%", thickness=1.5, color=COR_ORANGE, spaceAfter=10))
+    story.append(
+        HRFlowable(width="100%", thickness=1.5, color=COR_ORANGE, spaceAfter=10)
+    )
 
     # --- 2. TÍTULO DO DOCUMENTO ---
-    story.append(Paragraph("ORÇAMENTO / PROPOSTA", styles['TituloDocumento']))
+    story.append(Paragraph("ORÇAMENTO / PROPOSTA", styles["TituloDocumento"]))
     story.append(Spacer(1, 10))
 
     # --- 3. QUADRO COM DADOS DO CLIENTE E ORÇAMENTO (Borda Azul) ---
@@ -1031,61 +1206,91 @@ async def gerar_pdf_orcamento(
 
     grid_dados = [
         [
-            Paragraph(f"<font color='{COR_AZUL_HDR.hexval()}'>CLIENTE / CONTRATANTE</font><br/><b>{nome_cliente}</b>", styles['GridValue']),
-            Paragraph(f"<font color='{COR_AZUL_HDR.hexval()}'>TELEFONE</font><br/><b>{tel_cliente}</b>", styles['GridValue']),
-            Paragraph(f"<font color='{COR_AZUL_HDR.hexval()}'>DATA DA EMISSÃO</font><br/><b>{str(datetime.datetime.now())}</b>", styles['GridValue'])
+            Paragraph(
+                f"<font color='{COR_AZUL_HDR.hexval()}'>CLIENTE / CONTRATANTE</font><br/><b>{nome_cliente}</b>",
+                styles["GridValue"],
+            ),
+            Paragraph(
+                f"<font color='{COR_AZUL_HDR.hexval()}'>TELEFONE</font><br/><b>{tel_cliente}</b>",
+                styles["GridValue"],
+            ),
+            Paragraph(
+                f"<font color='{COR_AZUL_HDR.hexval()}'>DATA DA EMISSÃO</font><br/><b>{datetime.datetime.now().strftime('%d/%m/%Y - %H:%M')}</b>",
+                styles["GridValue"],
+            ),
         ],
         [
-            Paragraph(f"<font color='{COR_AZUL_HDR.hexval()}'>ENDEREÇO</font><br/><b>{end_cliente}</b>", styles['GridValue']),
+            Paragraph(
+                f"<font color='{COR_AZUL_HDR.hexval()}'>ENDEREÇO</font><br/><b>{end_cliente}</b>",
+                styles["GridValue"],
+            ),
             "",  # Célula Mesclada
-            Paragraph(f"<font color='{COR_AZUL_HDR.hexval()}'>VALIDADE DA PROPOSTA</font><br/><b>10 dias a contar da data da emissão</b>", styles['GridValue'])
-        ]
+            Paragraph(
+                f"<font color='{COR_AZUL_HDR.hexval()}'>VALIDADE DA PROPOSTA</font><br/><b>10 dias a contar da data da emissão</b>",
+                styles["GridValue"],
+            ),
+        ],
     ]
 
     tbl_cliente = Table(grid_dados, colWidths=[240, 120, 175])
-    tbl_cliente.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.8, COR_BORDA_AZUL),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COR_BORDA_AZUL),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Alinha os títulos no topo
-        ('SPAN', (0, 1), (1, 1)),             # Mescla Endereço
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-    ]))
+    tbl_cliente.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.8, COR_BORDA_AZUL),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, COR_BORDA_AZUL),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),  # Alinha os títulos no topo
+                ("SPAN", (0, 1), (1, 1)),  # Mescla Endereço
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(tbl_cliente)
     story.append(Spacer(1, 10))
 
     # --- 4. INTRODUÇÃO ---
-    story.append(Paragraph("Prezado(a) Cliente,", styles['TextoCorpo']))
+    story.append(Paragraph("Prezado(a) Cliente,", styles["TextoCorpo"]))
     story.append(Spacer(1, 3))
 
     if str(orcamento.introducao):
         html_intro = limpar_html_para_reportlab(orcamento.introducao)
-        story.append(Paragraph(html_intro, styles['TextoCorpo']))
+        story.append(Paragraph(html_intro, styles["TextoCorpo"]))
     else:
         text_intro = f"Vimos por meio deste, apresentar o orçamento/proposta para confecção, fornecimento e instalação de <b>MÓVEIS PLANEJADOS</b>, conforme descrição abaixo."
-        story.append(Paragraph(text_intro, styles['TextoCorpo']))
+        story.append(Paragraph(text_intro, styles["TextoCorpo"]))
 
     story.append(Spacer(1, 8))
 
     # --- 5. ESPECIFICAÇÕES TÉCNICAS E MATÉRIA PRIMA ---
-    story.append(Paragraph("ESPECIFICAÇÕES TÉCNICAS", styles['SecaoTitulo']))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=COR_BORDA_AZUL, spaceAfter=4))
-    
-    story.append(Paragraph("MATÉRIA PRIMA", styles['SecaoTitulo']))
+    story.append(Paragraph("ESPECIFICAÇÕES TÉCNICAS", styles["SecaoTitulo"]))
+    story.append(
+        HRFlowable(width="100%", thickness=0.5, color=COR_BORDA_AZUL, spaceAfter=4)
+    )
+
+    story.append(Paragraph("MATÉRIA PRIMA", styles["SecaoTitulo"]))
     raw_materia = limpar_html_para_reportlab(orcamento.materiaPrima)
-    story.append(Paragraph(limpar_html_para_reportlab(raw_materia), styles['TextoCorpo']))
+    story.append(
+        Paragraph(limpar_html_para_reportlab(raw_materia), styles["TextoCorpo"])
+    )
     story.append(Spacer(1, 10))
 
     # --- 6. TABELA DE ITENS E VALORES ---
-    story.append(Paragraph("AMBIENTE E ESPECIFICAÇÕES DO PROJETO", styles['SecaoTitulo']))
-    
-    tabela_data = [[
-        Paragraph("<b>LOCAL / AMBIENTE</b>", styles['TableHead']),
-        Paragraph("<b>O QUE SERÁ FEITO</b>", styles['TableHead']),
-        Paragraph("<b>VALORES</b>", ParagraphStyle('TR', parent=styles['TableHead'], alignment=TA_RIGHT))
-    ]]
+    story.append(
+        Paragraph("AMBIENTE E ESPECIFICAÇÕES DO PROJETO", styles["SecaoTitulo"])
+    )
+
+    tabela_data = [
+        [
+            Paragraph("<b>LOCAL / AMBIENTE</b>", styles["TableHead"]),
+            Paragraph("<b>O QUE SERÁ FEITO</b>", styles["TableHead"]),
+            Paragraph(
+                "<b>VALORES</b>",
+                ParagraphStyle("TR", parent=styles["TableHead"], alignment=TA_RIGHT),
+            ),
+        ]
+    ]
 
     total_geral = 0.0
     if orcamento.itens:
@@ -1095,75 +1300,117 @@ async def gerar_pdf_orcamento(
             if item.descricao:
                 desc_complete += f"<br/><font size=7 color='#475569'>{limpar_html_para_reportlab(item.descricao)}</font>"
 
-            tabela_data.append([
-                Paragraph(limpar_html_para_reportlab(item.local) or "Ambiente", styles['TextoCorpo']),
-                Paragraph(limpar_html_para_reportlab(desc_complete), styles['TextoCorpo']),
-                Paragraph(format_currency(item.valor), ParagraphStyle('TRV', parent=styles['TextoCorpo'], alignment=TA_RIGHT, fontName='Helvetica-Bold'))
-            ])
+            tabela_data.append(
+                [
+                    Paragraph(
+                        limpar_html_para_reportlab(item.local) or "Ambiente",
+                        styles["TextoCorpo"],
+                    ),
+                    Paragraph(
+                        limpar_html_para_reportlab(desc_complete), styles["TextoCorpo"]
+                    ),
+                    Paragraph(
+                        format_currency(item.valor),
+                        ParagraphStyle(
+                            "TRV",
+                            parent=styles["TextoCorpo"],
+                            alignment=TA_RIGHT,
+                            fontName="Helvetica-Bold",
+                        ),
+                    ),
+                ]
+            )
     else:
-        tabela_data.append([
-            Paragraph("<i>Nenhum item adicionado</i>", styles['TextoCorpo']),
-            "", ""
-        ])
+        tabela_data.append(
+            [Paragraph("<i>Nenhum item adicionado</i>", styles["TextoCorpo"]), "", ""]
+        )
 
     # Linha Total
-    tabela_data.append([
-        "",
-        Paragraph("<b>Total Geral em R$</b>", ParagraphStyle('TotLbl', parent=styles['GridValue'], alignment=TA_RIGHT, textColor=COR_AZUL_HDR)),
-        Paragraph(f"<b>{format_currency(total_geral)}</b>", ParagraphStyle('TotVal', parent=styles['GridValue'], alignment=TA_RIGHT))
-    ])
+    tabela_data.append(
+        [
+            "",
+            Paragraph(
+                "<b>Total Geral em R$</b>",
+                ParagraphStyle(
+                    "TotLbl",
+                    parent=styles["GridValue"],
+                    alignment=TA_RIGHT,
+                    textColor=COR_AZUL_HDR,
+                ),
+            ),
+            Paragraph(
+                f"<b>{format_currency(total_geral)}</b>",
+                ParagraphStyle(
+                    "TotVal", parent=styles["GridValue"], alignment=TA_RIGHT
+                ),
+            ),
+        ]
+    )
 
     tbl_itens = Table(tabela_data, colWidths=[140, 285, 110])
-    tbl_itens.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.8, COR_BORDA_AZUL),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COR_BORDA_AZUL),
-        ('BACKGROUND', (0, 0), (-1, 0), COR_BG_TABELA),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E0F2FE')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
+    tbl_itens.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.8, COR_BORDA_AZUL),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, COR_BORDA_AZUL),
+                ("BACKGROUND", (0, 0), (-1, 0), COR_BG_TABELA),
+                ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E0F2FE")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(tbl_itens)
     story.append(Spacer(1, 10))
 
     # --- 7. FORMAS DE PAGAMENTO / PRAZO ---
-    story.append(Paragraph("FORMAS DE PAGAMENTO / PRAZO", styles['SecaoTitulo']))
-    raw_pagto = limpar_html_para_reportlab(orcamento.formaPagamento)
-    story.append(Paragraph(limpar_html_para_reportlab(raw_pagto), styles['TextoCorpo']))
+    story.append(Paragraph("FORMAS DE PAGAMENTO / PRAZO", styles["SecaoTitulo"]))
+    story.append(Spacer(1, 0))
 
-    story.append(Spacer(1, 15))
+    elems_to_add = html_para_flowables(limpar_html_para_reportlab(orcamento.formaPagamento), styles["TextoCorpo"])
+    for elem in elems_to_add:
+        story.append(elem)
 
     # --- 8. FECHAMENTO E ASSINATURAS (Mantidos juntos para não quebrar página) ---
     bloco_assinaturas = []
-    bloco_assinaturas.append(Paragraph("<i>Sendo assim, as partes estando de acordo, assinam e reconhece a PROPOSTA / ORÇAMENTO como legítimo.</i>", styles['TextoLegal']))
+    bloco_assinaturas.append(Spacer(1, 30))
+    bloco_assinaturas.append(
+        Paragraph(
+            "<i>Sendo assim, as partes estando de acordo, assinam e reconhece a PROPOSTA / ORÇAMENTO como legítimo.</i>",
+            styles["TextoLegal"],
+        )
+    )
     bloco_assinaturas.append(Spacer(1, 25))
 
-    nome_prestador = (
-        current_user.nome
-    )
+    nome_prestador = current_user.nome
 
     col_cliente = Paragraph(
         f"____________________________________________<br/><b>{nome_cliente}</b><br/><font size=7 color='#64748B'>Cliente / Contratante</font>",
-        ParagraphStyle('AC', parent=styles['TextoCorpo'], alignment=TA_CENTER)
+        ParagraphStyle("AC", parent=styles["TextoCorpo"], alignment=TA_CENTER),
     )
     col_contratado = Paragraph(
         f"____________________________________________<br/><b>{nome_prestador}</b><br/><font size=7 color='#64748B'>Contratado</font>",
-        ParagraphStyle('AP', parent=styles['TextoCorpo'], alignment=TA_CENTER)
+        ParagraphStyle("AP", parent=styles["TextoCorpo"], alignment=TA_CENTER),
     )
 
     tbl_assinaturas = Table([[col_cliente, col_contratado]], colWidths=[260, 260])
     bloco_assinaturas.append(tbl_assinaturas)
-    
+
     story.append(KeepTogether(bloco_assinaturas))
     story.append(Spacer(1, 15))
 
     # --- 9. RODAPÉ DO DOCUMENTO ---
-    story.append(HRFlowable(width="100%", thickness=1.5, color=COR_ORANGE, spaceAfter=6))
-    
+    story.append(
+        HRFlowable(width="100%", thickness=1.5, color=COR_ORANGE, spaceAfter=6)
+    )
+
     end_empresa = current_user.endereco
     fone_empresa = current_user.telefone
-    
-    story.append(Paragraph(f"{end_empresa} – Fone / Whatsapp {fone_empresa}", styles['Rodape']))
+
+    story.append(
+        Paragraph(f"Endereço: {end_empresa} / Telefone: {fone_empresa}", styles["Rodape"])
+    )
 
     # --- CONSTRUÇÃO DO PDF ---
     doc.build(story)
@@ -1173,10 +1420,9 @@ async def gerar_pdf_orcamento(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"inline; filename=orcamento.pdf"
-        }
+        headers={"Content-Disposition": f"inline; filename=orcamento.pdf"},
     )
+
 
 # @app.get("/api/orcamentos/{orcamento_id}/pdf")
 # async def gerar_pdf_orcamento(
@@ -1205,7 +1451,7 @@ async def gerar_pdf_orcamento(
 #         "prazo": "O prazo será à combinar.",
 #         "empresa_endereco": current_user.endereco,
 #     }
-# 
+#
 #     buffer = BytesIO()
 #     doc = SimpleDocTemplate(
 #         buffer,
@@ -1215,13 +1461,13 @@ async def gerar_pdf_orcamento(
 #         topMargin=20,
 #         bottomMargin=20,
 #     )
-# 
+#
 #     story = []
 #     styles = criar_estilos()
-# 
+#
 #     # --- 2. LINHA LARANJA SUPERIOR ---
 #     story.append(HRFlowable(width="100%", thickness=3, color=COR_ORANGE, spaceAfter=15))
-# 
+#
 #     # --- 3. CABEÇALHO LOGOMARCA ---
 #     tbl_logo_data = [
 #         [
@@ -1261,18 +1507,18 @@ async def gerar_pdf_orcamento(
 #             ]
 #         )
 #     )
-# 
+#
 #     # Envelopa o logo para centralizar na folha
 #     tbl_logo_wrapper = Table([[tbl_logo]], colWidths=[535])
 #     tbl_logo_wrapper.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER")]))
 #     story.append(tbl_logo_wrapper)
 #     story.append(Spacer(1, 10))
 #     story.append(HRFlowable(width="100%", thickness=1, color=COR_ORANGE, spaceAfter=15))
-# 
+#
 #     # --- 4. TÍTULO DO DOCUMENTO ---
 #     story.append(Paragraph("ORÇAMENTO / PROPOSTA", styles["TituloPrincipal"]))
 #     story.append(Spacer(1, 12))
-# 
+#
 #     # --- 5. GRID DE DADOS DO CLIENTE E PROPOSTA ---
 #     dados_cliente_grid = [
 #         [
@@ -1297,7 +1543,7 @@ async def gerar_pdf_orcamento(
 #             ),
 #         ],
 #     ]
-# 
+#
 #     tbl_cliente = Table(dados_cliente_grid, colWidths=[200, 165, 170])
 #     tbl_cliente.setStyle(
 #         TableStyle(
@@ -1316,24 +1562,24 @@ async def gerar_pdf_orcamento(
 #     )
 #     story.append(tbl_cliente)
 #     story.append(Spacer(1, 12))
-# 
+#
 #     # --- 6. SAUDAÇÃO E ESPECIFICAÇÕES TÉCNICAS ---
 #     # story.append(Paragraph("Prezado(a) Cliente,", styles["TextoCorpo"]))
 #     story.append(Paragraph(dados["saudacao"], styles["TextoCorpo"]))
 #     story.append(Spacer(1, 8))
-# 
+#
 #     story.append(Paragraph("ESPECIFICAÇÕES TÉCNICAS", styles["SecaoTitulo"]))
 #     story.append(HRFlowable(width="100%", thickness=0.5, color=COR_BORDA, spaceAfter=6))
-# 
+#
 #     story.append(Paragraph("MATÉRIA PRIMA", styles["SecaoTitulo"]))
 #     story.append(Paragraph(dados["materia_prima"], styles["TextoCorpo"]))
 #     story.append(Spacer(1, 10))
-# 
+#
 #     # --- 7. AMBIENTE E ESPECIFICAÇÕES DO PROJETO (TABELA) ---
 #     story.append(
 #         Paragraph("AMBIENTE E ESPECIFICAÇÕES DO PROJETO", styles["SecaoTitulo"])
 #     )
-# 
+#
 #     header_tabela = [
 #         Paragraph("<b>LOCAL / AMBIENTE</b>", styles["CellLabel"]),
 #         Paragraph("<b>O QUE SERÁ FEITO</b>", styles["CellLabel"]),
@@ -1342,9 +1588,9 @@ async def gerar_pdf_orcamento(
 #             ParagraphStyle("R", parent=styles["CellLabel"], alignment=TA_RIGHT),
 #         ),
 #     ]
-# 
+#
 #     tabela_itens_data = [header_tabela]
-# 
+#
 #     for item in dados["itens"]:
 #         tabela_itens_data.append(
 #             [
@@ -1358,7 +1604,7 @@ async def gerar_pdf_orcamento(
 #                 ),
 #             ]
 #         )
-# 
+#
 #     # Linha Total
 #     tabela_itens_data.append(
 #         [
@@ -1380,7 +1626,7 @@ async def gerar_pdf_orcamento(
 #             ),
 #         ]
 #     )
-# 
+#
 #     # Linha Extenso
 #     tabela_itens_data.append(
 #         [
@@ -1392,7 +1638,7 @@ async def gerar_pdf_orcamento(
 #             "",
 #         ]
 #     )
-# 
+#
 #     tbl_itens = Table(tabela_itens_data, colWidths=[160, 275, 100])
 #     tbl_itens.setStyle(
 #         TableStyle(
@@ -1408,16 +1654,16 @@ async def gerar_pdf_orcamento(
 #     )
 #     story.append(tbl_itens)
 #     story.append(Spacer(1, 10))
-# 
+#
 #     # --- 8. PAGAMENTO E PRAZO ---
 #     story.append(Paragraph("FORMAS DE PAGAMENTO", styles["SecaoTitulo"]))
 #     story.append(Paragraph(dados["pagamento"], styles["TextoCorpo"]))
 #     story.append(Spacer(1, 6))
-# 
+#
 #     story.append(Paragraph("PRAZO DE ENTREGA", styles["SecaoTitulo"]))
 #     story.append(Paragraph(f"• {dados['prazo']}", styles["TextoCorpo"]))
 #     story.append(Spacer(1, 20))
-# 
+#
 #     # --- 9. CLÁUSULA LEGAL E ASSINATURAS ---
 #     story.append(
 #         Paragraph(
@@ -1426,7 +1672,7 @@ async def gerar_pdf_orcamento(
 #         )
 #     )
 #     story.append(Spacer(1, 30))
-# 
+#
 #     linha_assinatura = [
 #         [
 #             Paragraph(
@@ -1446,18 +1692,18 @@ async def gerar_pdf_orcamento(
 #     tbl_assinaturas = Table(linha_assinatura, colWidths=[260, 260])
 #     story.append(tbl_assinaturas)
 #     story.append(Spacer(1, 20))
-# 
+#
 #     # --- 10. RODAPÉ E LINHA LARANJA INFERIOR ---
 #     story.append(
 #         HRFlowable(width="100%", thickness=1.5, color=COR_ORANGE, spaceAfter=8)
 #     )
 #     story.append(Paragraph(dados["empresa_endereco"], styles["RodapeEnd"]))
-# 
+#
 #     # --- 11. BUILD PDF ---
 #     doc.build(story)
 #     pdf_bytes = buffer.getvalue()
 #     buffer.close()
-# 
+#
 #     return Response(
 #         content=pdf_bytes,
 #         media_type="application/pdf",

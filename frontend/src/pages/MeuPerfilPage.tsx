@@ -314,7 +314,7 @@ export const MeuPerfilPage: React.FC<MeuPerfilPageProps> = ({ navigate, addToast
           {/* CNPJ */}
           <div className="space-y-1">
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-              CNPJ (Máscara Padrão)
+              CNPJ
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -335,7 +335,7 @@ export const MeuPerfilPage: React.FC<MeuPerfilPageProps> = ({ navigate, addToast
           {/* Telefone */}
           <div className="space-y-1">
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-              Telefone / Comercial (Máscara Padrão)
+              Telefone / Comercial
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchClientes, fetchOrcamentos, deleteCliente, deleteOrcamento, updateOrcamento } from '../services/api';
+import { fetchClientes, fetchOrcamentos, deleteCliente, deleteOrcamento, updateOrcamento, getAnexoFile } from '../services/api';
 import { Cliente, Orcamento } from '../types';
 import { OrcamentoPrintView } from '../components/OrcamentoPrintView';
 import { formatDate, formatPhone } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
 import {
   Users, FileText, PlusCircle, Search, Filter, Trash2, Edit3, Eye, EyeOff, DollarSign,
   TrendingUp, CheckCircle2, Clock, AlertTriangle, ArrowUpRight, Phone, Mail, Tag,
@@ -25,6 +26,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   setEditingOrcamento,
   addToast
 }) => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'orcamentos' | 'clientes'>('orcamentos');
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,7 +47,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   // Queries
   const { data: clientes = [], isLoading: loadingClientes, refetch: refetchClientes } = useQuery({
-    queryKey: ['clientes'],
+    queryKey: ['clientes', user?.id],
     queryFn: fetchClientes
   });
 
@@ -181,6 +183,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3.5 h-3.5 text-amber-600" /> Pendente</span>;
     }
   };
+
+  const handleGetAnexoFile = async (file_id: string, orc) => {
+    //const temp_file = await getAnexoFile(file_id + '.' + editingOrcamento.arquivoNome.split('.').pop());
+    const temp_file = await getAnexoFile(file_id);
+    console.log(file_id);
+
+    const url = URL.createObjectURL(temp_file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = orc.arquivoNome;
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -405,7 +423,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-2.5 px-3.5">Identificador</th>
                       <th className="py-2.5 px-3.5">Cliente</th>
                       <th className="py-2.5 px-3.5">Datas (Emissão / Entrega)</th>
                       <th className="py-2.5 px-3.5">Itens</th>
@@ -418,9 +435,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <tbody className="divide-y divide-slate-100">
                     {paginatedOrcamentos.map(orc => (
                       <tr key={orc.id} className="hover:bg-orange-50/40 transition-colors">
-                        <td className="py-2.5 px-3.5 font-mono font-bold text-orange-600">
-                          #{orc.id}
-                        </td>
                         <td className="py-2.5 px-3.5">
                           <div className="font-semibold text-slate-900">{orc.cliente?.nome || 'Cliente Desconhecido'}</div>
                           <div className="text-[11px] text-slate-500">{orc.cliente?.apelido ? `"${orc.cliente.apelido}"` : ''} • {orc.cliente?.email || ''}</div>
@@ -437,14 +451,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           </span>
                         </td>
                         <td className="py-2.5 px-3.5">
-                          {orc.arquivo ? (
+                          {orc.arquivoId ? (
                             <a
-                              href={orc.arquivo}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] text-orange-600 hover:underline font-semibold bg-orange-50 px-2 py-0.5 rounded border border-orange-100"
-                            >
-                              Anexo
+			      onClick={() => handleGetAnexoFile(orc.arquivoId, orc)}
+                              className="inline-flex items-center gap-1 text-[11px] text-orange-600 hover:underline font-semibold bg-orange-50 px-2 py-0.5 rounded border border-orange-100 cursor-pointer">
+                            {orc.arquivoNome}
                             </a>
                           ) : (
                             <span className="text-slate-400 text-[11px]">-</span>
@@ -569,7 +580,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-2.5 px-3.5">Identificador</th>
                       <th className="py-2.5 px-3.5">Nome do Cliente</th>
                       <th className="py-2.5 px-3.5">Apelido</th>
                       <th className="py-2.5 px-3.5">Contatos</th>
@@ -582,7 +592,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       const clientOrcamentos = orcamentos.filter(o => o.cliente_id === cli.id);
                       return (
                         <tr key={cli.id} className="hover:bg-orange-50/40 transition-colors">
-                          <td className="py-2.5 px-3.5 font-mono font-bold text-slate-500">{cli.id}</td>
                           <td className="py-2.5 px-3.5 font-semibold text-slate-900 text-xs">{cli.nome}</td>
                           <td className="py-2.5 px-3.5">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-orange-700 text-[11px] font-medium border border-slate-200">

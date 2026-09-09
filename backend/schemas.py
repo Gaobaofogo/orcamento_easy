@@ -147,6 +147,14 @@ class OrcamentoCreate(BaseModel):
     formaPagamento: Optional[str] = ""
     itens: Optional[List[ItemOrcamentoCreate]] = []
 
+    @field_validator("arquivo", mode="before")
+    @classmethod
+    def parse_arquivo(cls, v):
+        if isinstance(v, str) and len(v) == 0 or v is None:
+            return UploadFile(file=BytesIO())
+
+        return v
+
     @field_validator("itens", mode="before")
     @classmethod
     def parse_itens(cls, v):

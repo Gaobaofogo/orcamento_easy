@@ -1,21 +1,40 @@
 import { Cliente, Orcamento, User, LoginResponse, PasswordResetResponse } from '../types';
 
-const getAuthHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem('orcamento_jwt_token');
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
+// Evento para notificar a aplicação de que a sessão acabou de vez
+export const TOKEN_EXPIRED_EVENT = 'auth:token_expired';
+
+const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const options: RequestInit = {
+    ...init,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers
+    }
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+
+  let response = await fetch(input, options);
+
+  if (response.status === 401) {
+    try {
+      const refreshResponse = await fetch('/api/auth/refresh', {method: 'POST', credentials: 'include'});
+
+      if (refreshResponse.ok) {
+	response = await fetch(input, options);
+      } else {
+	window.dispatchEvent(new Event(TOKEN_EXPIRED_EVENT));
+      }
+    } catch (error) {
+      window.dispatchEvent(new Event(TOKEN_EXPIRED_EVENT));
+    }
   }
-  return headers;
+
+  return response;
 };
 
 export async function loginApi(email: string, senha: string): Promise<LoginResponse> {
-  const res = await fetch('/api/auth/login', {
+  const res = await apiFetch('/api/auth/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify({ email, senha })
   });
 
@@ -36,10 +55,8 @@ export async function registerApi(userData: {
   telefone?: string;
   endereco?: string;
 }): Promise<LoginResponse> {
-  const res = await fetch('/api/auth/register', {
+  const res = await apiFetch('/api/auth/register', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(userData)
   });
 
@@ -51,27 +68,27 @@ export async function registerApi(userData: {
 }
 
 export async function getMeApi(): Promise<User> {
-  const res = await fetch('/api/auth/me', {
-    headers: getAuthHeaders(),
-    credentials: 'include'
+  const res = await apiFetch('/api/auth/me', {
+    method: 'GET'
   });
+
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error || 'Sessão inválida.');
   }
+ 
   return data;
 }
 
 export async function logoutApi(): Promise<{ message: string }> {
-  const res = await fetch('/api/auth/logout', {
+  const res = await apiFetch('/api/auth/logout', {
     method: 'POST',
-    credentials: 'include'
   });
   return res.json();
 }
 
 export async function updateUserProfileApi(userData: Partial<User>): Promise<User> {
-  const res = await fetch('/api/user/profile', {
+  const res = await apiFetch('/api/user/profile', {
     method: 'PUT',
     headers: getAuthHeaders(),
     credentials: 'include',
@@ -86,10 +103,8 @@ export async function updateUserProfileApi(userData: Partial<User>): Promise<Use
 }
 
 export async function changePasswordApi(oldPassword: string, newPassword: string): Promise<{ message: string }> {
-  const res = await fetch('/api/user/change-password', {
+  const res = await apiFetch('/api/user/change-password', {
     method: 'POST',
-    headers: getAuthHeaders(),
-    credentials: 'include',
     body: JSON.stringify({ old_password: oldPassword, new_password: newPassword, senha_atual: oldPassword, nova_senha: newPassword })
   });
 
@@ -101,10 +116,8 @@ export async function changePasswordApi(oldPassword: string, newPassword: string
 }
 
 export async function esqueciSenhaApi(email: string): Promise<PasswordResetResponse> {
-  const res = await fetch('/api/auth/esqueci-a-senha', {
+  const res = await apiFetch('/api/auth/esqueci-a-senha', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify({ email })
   });
 
@@ -116,10 +129,8 @@ export async function esqueciSenhaApi(email: string): Promise<PasswordResetRespo
 }
 
 export async function resetPasswordApi(token: string, novaSenha: string): Promise<{ message: string }> {
-  const res = await fetch('/api/auth/reset-password', {
+  const res = await apiFetch('/api/auth/reset-password', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify({ token, novaSenha })
   });
 
@@ -130,10 +141,13 @@ export async function resetPasswordApi(token: string, novaSenha: string): Promis
   return data;
 }
 
-export async function fetchClientes(): Promise<Cliente[]> {
-  const res = await fetch('/api/clientes', {
-    headers: getAuthHeaders(),
-    credentials: 'include'
+export async function fetchClientes(userId?: string): Promise<Cliente[]> {
+  const url = new URL('/api/clientes', window.location.origin);
+  if (userId)
+    url.searchParams.append('user_id', userId);
+
+  const res = await fetch(url.toString(), {
+    method: 'GET'
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
@@ -143,10 +157,8 @@ export async function fetchClientes(): Promise<Cliente[]> {
 }
 
 export async function createCliente(clienteData: Partial<Cliente>): Promise<Cliente> {
-  const res = await fetch('/api/clientes', {
+  const res = await apiFetch('/api/clientes', {
     method: 'POST',
-    headers: getAuthHeaders(),
-    credentials: 'include',
     body: JSON.stringify(clienteData)
   });
   const data = await res.json();
@@ -171,10 +183,8 @@ export async function updateCliente(id: string, clienteData: Partial<Cliente>): 
 }
 
 export async function deleteCliente(id: string): Promise<{ message: string }> {
-  const res = await fetch(`/api/clientes/${id}`, {
+  const res = await apiFetch(`/api/clientes/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
-    credentials: 'include'
   });
   const data = await res.json();
   if (!res.ok) {
@@ -184,9 +194,8 @@ export async function deleteCliente(id: string): Promise<{ message: string }> {
 }
 
 export async function fetchOrcamentos(): Promise<Orcamento[]> {
-  const res = await fetch('/api/orcamentos', {
-    headers: getAuthHeaders(),
-    credentials: 'include'
+  const res = await apiFetch('/api/orcamentos', {
+    method: 'GET'
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
@@ -196,9 +205,8 @@ export async function fetchOrcamentos(): Promise<Orcamento[]> {
 }
 
 export async function fetchOrcamentoById(id: string): Promise<Orcamento> {
-  const res = await fetch(`/api/orcamentos/${id}`, {
-    headers: getAuthHeaders(),
-    credentials: 'include'
+  const res = await apiFetch(`/api/orcamentos/${id}`, {
+    method: 'GET'
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
@@ -247,10 +255,8 @@ export async function createOrcamento(orcamentoData: Record<string, any>): Promi
   headers.delete('Content-Type');
   headers.delete('content-type');
 
-  const res = await fetch('/api/orcamentos', {
+  const res = await apiFetch('/api/orcamentos', {
     method: 'POST',
-    headers: headers,
-    credentials: 'include',
     body: formData
   });
 
@@ -263,7 +269,6 @@ export async function createOrcamento(orcamentoData: Record<string, any>): Promi
 }
 
 export async function updateOrcamento(id: string, orcamentoData: any): Promise<Orcamento> {
-  console.log(orcamentoData);
   const formData = new FormData();
 
   Object.keys(orcamentoData).forEach((key) => {
@@ -290,10 +295,8 @@ export async function updateOrcamento(id: string, orcamentoData: any): Promise<O
   headers.delete('Content-Type');
   headers.delete('content-type');
 
-  const res = await fetch(`/api/orcamentos/${id}`, {
+  const res = await apiFetch(`/api/orcamentos/${id}`, {
     method: 'PUT',
-    headers: headers,
-    credentials: 'include',
     body: formData
   });
 
@@ -319,10 +322,8 @@ export async function updateOrcamento(id: string, orcamentoData: any): Promise<O
 // }
 
 export async function deleteOrcamento(id: string): Promise<{ message: string }> {
-  const res = await fetch(`/api/orcamentos/${id}`, {
+  const res = await apiFetch(`/api/orcamentos/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
-    credentials: 'include',
     body: JSON.stringify({})
   });
   const data = await res.json();
@@ -333,10 +334,8 @@ export async function deleteOrcamento(id: string): Promise<{ message: string }> 
 }
 
 export async function getOrcamentoFile(orcamento_id: string): Promise<File> {
-  const res = await fetch(`/api/orcamentos/${orcamento_id}/pdf`, {
+  const res = await apiFetch(`/api/orcamentos/${orcamento_id}/pdf`, {
     method: 'GET',
-    headers: getAuthHeaders(),
-    credentials: 'include',
   });
  
   const blob = res.blob();
@@ -349,10 +348,8 @@ export async function getOrcamentoFile(orcamento_id: string): Promise<File> {
 
 
 export async function getAnexoFile(file_id: string): Promise<File> {
-  const res = await fetch(`/api/files/${file_id}`, {
+  const res = await apiFetch(`/api/files/${file_id}`, {
     method: 'GET',
-    headers: getAuthHeaders(),
-    credentials: 'include',
   });
  
   const blob = res.blob();

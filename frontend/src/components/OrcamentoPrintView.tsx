@@ -235,7 +235,7 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
               </div>
             )}
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-600">
-              MÓVEIS PROJETADOS EM GERAL
+	      {user?.razaoSocial ? user?.razaoSocial : "MÓVEIS PROJETADOS EM GERAL"}
             </p>
           </div>
 
@@ -266,12 +266,12 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
               </div>
             </div>
 
-            <div className="grid grid-cols-3 divide-x divide-sky-700/30 bg-white">
-              <div className="p-2.5 col-span-2">
+            <div className="grid grid-cols-12 divide-x divide-sky-700/30 bg-white">
+              <div className="p-2.5 col-span-7">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Endereço</span>
                 <span className="font-bold text-slate-900">{orcamento.cliente?.endereco || 'Caicó – RN'}</span>
               </div>
-              <div className="p-2.5">
+              <div className="p-2.5 col-span-5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Validade da proposta</span>
                 <span className="font-bold text-slate-900">{validadeDias}</span>
               </div>
