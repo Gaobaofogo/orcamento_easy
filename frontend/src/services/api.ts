@@ -1,16 +1,35 @@
 import { Cliente, Orcamento, User, LoginResponse, PasswordResetResponse } from '../types';
 
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('orcamento_jwt_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 // Evento para notificar a aplicação de que a sessão acabou de vez
 export const TOKEN_EXPIRED_EVENT = 'auth:token_expired';
 
 const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const isFormData = init?.body instanceof FormData;
+  const headers = new Headers(init?.headers);
+
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (isFormData) {
+    headers.delete('Content-Type');
+  }
+
   const options: RequestInit = {
     ...init,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers
-    }
+    headers,
   };
 
   let response = await fetch(input, options);
