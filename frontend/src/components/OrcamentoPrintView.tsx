@@ -262,14 +262,14 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
               </div>
               <div className="p-2.5 col-span-5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Data da emissão</span>
-                <span className="font-bold text-slate-900">{formatFullDateWithWeekday(orcamento.data)}</span>
+                <span className="font-bold text-slate-900">{formatFullDateWithWeekday(new Date())}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-12 divide-x divide-sky-700/30 bg-white">
               <div className="p-2.5 col-span-7">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Endereço</span>
-                <span className="font-bold text-slate-900">{orcamento.cliente?.endereco || 'Caicó – RN'}</span>
+                <span className="font-bold text-slate-900">{orcamento.cliente?.endereco}</span>
               </div>
               <div className="p-2.5 col-span-5">
                 <span className="block text-[10px] font-bold text-sky-800 uppercase">Validade da proposta</span>
@@ -367,18 +367,6 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
                     </td>
                     <td className="py-2 px-3 text-right text-slate-900 text-sm font-mono font-black">
                       {formatCurrency(totalValor)}
-                    </td>
-                  </tr>
-
-                  {/* Valor Por Extenso Row */}
-                  <tr className="border-t border-sky-700/40 bg-sky-100/40">
-                    <td colSpan={3} className="p-2.5 space-y-1">
-                      <span className="block text-[10px] font-bold text-sky-900 uppercase italic">
-                        Valor por extenso do Orçamento / Proposta
-                      </span>
-                      <span className="block font-bold text-sky-900 text-xs">
-                        {totalExtenso}
-                      </span>
                     </td>
                   </tr>
                 </tfoot>

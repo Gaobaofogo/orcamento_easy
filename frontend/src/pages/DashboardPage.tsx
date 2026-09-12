@@ -411,7 +411,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </p>
                 <button
                   onClick={() => handleCreateNewOrcamento()}
-                  className="mt-2 inline-flex items-center gap-2 px-3.5 py-1.5 bg-orange-400 hover:bg-orange-500 text-slate-950 font-bold rounded-lg text-xs transition-colors shadow-sm cursor-pointer"
+                  className="mt-2 inline-flex items-center gap-2 px-3.5 py-1.5 bg-orange-400 hover:bg-orange-500 text-slate-200 font-bold rounded-lg text-xs transition-colors shadow-sm cursor-pointer"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
                   Criar Primeiro Orçamento
