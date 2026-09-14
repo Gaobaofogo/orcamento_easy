@@ -33,7 +33,7 @@ interface CadastroFormInputs {
 }
 
 export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }) => {
-  const { setToken } = useAuth();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -81,7 +81,10 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({ navigate, addToast }
         endereco: data.endereco
       });
 
-      setToken(response.token, response.user);
+      await login(
+        data.email,
+        data.senha,
+      );
       addToast('Cadastro Realizado!', 'success', 'Sua conta foi criada com sucesso. Bem-vindo ao sistema!');
       navigate('/dashboard');
     } catch (err: any) {
