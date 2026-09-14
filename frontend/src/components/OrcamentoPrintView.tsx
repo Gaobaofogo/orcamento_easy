@@ -112,14 +112,6 @@ export const OrcamentoPrintView: React.FC<OrcamentoPrintViewProps> = ({ isOpen, 
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowEditorOptions(!showEditorOptions)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-colors cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-orange-400" />
-              {showEditorOptions ? 'Ocultar Opções de Edição' : 'Editar Prazos e Condições'}
-            </button>
 
             <button
               type="button"

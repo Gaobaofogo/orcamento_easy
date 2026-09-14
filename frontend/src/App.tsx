@@ -152,7 +152,7 @@ function AppRoutes() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
-      {showNavbar && <Navbar currentPath={currentPath} navigate={navigate} />}
+      {showNavbar && <Navbar currentPath={currentPath} navigate={navigate} setEditingOrcamento={setEditingOrcamento} />}
 
       <main className={showNavbar ? 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5' : 'flex-1'}>
         {renderPage()}

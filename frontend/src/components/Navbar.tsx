@@ -5,9 +5,11 @@ import { FileText, Users, PlusCircle, LogOut, FilePlus, LayoutDashboard, User } 
 interface NavbarProps {
   currentPath: string;
   navigate: (path: string) => void;
+  setEditingOrcamento: any;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, setEditingOrcamento }) => {
+
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
@@ -60,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
             </button>
 
             <button
-              onClick={() => navigate('/dashboard/criar-orçamento')}
+              onClick={() => {if (window.location.pathname !== '/dashboard/criar-or%C3%A7amento'){ setEditingOrcamento(); navigate('/dashboard/criar-orçamento'); console.log(window.location.pathname)}}}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 currentPath === '/dashboard/criar-orçamento' || currentPath === '/dashboard/criar-orcamento'
                   ? 'bg-orange-400 text-slate-200 font-bold shadow-sm hover:bg-orange-500'

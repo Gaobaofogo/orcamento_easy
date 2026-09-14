@@ -152,7 +152,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   const handleEditOrcamento = (o: Orcamento) => {
-    console.log("orcamento", o);
     setEditingOrcamento(o);
     navigate('/dashboard/criar-orçamento');
   };

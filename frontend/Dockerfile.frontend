@@ -10,6 +10,8 @@ COPY . .
 
 FROM base AS dev
 
+RUN npm install -g @vtsls/language-server typescript
+
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
