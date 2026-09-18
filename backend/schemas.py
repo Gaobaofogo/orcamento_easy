@@ -4,7 +4,7 @@ from io import BytesIO
 from typing import List, Optional
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, EmailStr
 
 logger = logging.getLogger(__name__)
 
@@ -232,3 +232,7 @@ class OrcamentoResponse(BaseModel):
     valorTotal: float = 0.0
 
     model_config = ConfigDict(from_attributes=True)
+
+    
+class SolicitacaoRecuperacaoSchema(BaseModel):
+    email: EmailStr

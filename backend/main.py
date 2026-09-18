@@ -15,6 +15,7 @@ from fastapi import (
     Request,
     UploadFile,
     status,
+    BackgroundTasks
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -30,10 +31,12 @@ from auth import (
     decode_token,
     generate_password,
     get_current_user,
+    criar_token_recuperacao_senha
 )
 from database import Base, engine, get_db
 from models import Cliente, ItemOrcamento, Orcamento, User
 from storage import storage_manager
+from email_service import enviar_email_recuperacao
 
 IS_DEVELOPMENT_ENV = True if os.getenv("APP_ENV") == "dev" else False
 
@@ -304,35 +307,61 @@ def change_password(
     db.commit()
     return {"message": "Senha alterada com sucesso!"}
 
+FRONTEND_URL = "http://localhost:3000"
 
 @app.post("/api/auth/esqueci-a-senha", response_model=schemas.PasswordResetResponse)
-def esqueci_senha(payload: schemas.EsqueciSenha, db: Session = Depends(get_db)):
-    start_op = time.time()
-    if not payload.email:
-        raise HTTPException(
-            status_code=400, detail="Por favor, informe o e-mail de cadastro."
+def esqueci_senha(payload: schemas.SolicitacaoRecuperacaoSchema, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # 1. Busca o usuário no banco de dados
+    user = db.query(User).filter(User.email == payload.email).first()
+
+    # 2. Se o e-mail existir, gera o token real e envia a mensagem
+    if user:
+        # Gera o JWT assinado para recuperação
+        token_recuperacao = criar_token_recuperacao_senha(str(user.email))
+        
+        # Link real que o usuário clicará no e-mail
+        link_recuperacao = f"{FRONTEND_URL}/reset-password?token={token_recuperacao}"
+
+        # Adiciona a tarefa de envio de e-mail em segundo plano
+        background_tasks.add_task(
+            enviar_email_recuperacao,
+            email_destino=str(user.email),
+            link_recuperacao=link_recuperacao
         )
 
-    email_clean = payload.email.lower()
-    user = db.query(User).filter(User.email == email_clean).first()
-
-    token = create_access_token(
-        {"email": email_clean, "purpose": "password-reset"},
-        expires_delta=datetime.timedelta(hours=1),
-    )
-
-    if user:
-        return {
-            "message": "Instruções de recuperação e token de redefinição foram gerados com sucesso!",
-            "tokenDemo": token,
-            "emailSentTo": email_clean,
-        }
-
+    # 3. Retorna resposta genérica para não expor a existência de e-mails na base
     return {
-        "message": "Se o e-mail estiver cadastrado em nosso sistema, você receberá o token de recuperação.",
-        "tokenDemo": token,
-        "emailSentTo": email_clean,
+        "message": "Se o e-mail estiver cadastrado em nosso sistema, você receberá um link para redefinir sua senha."
     }
+
+# @app.post("/api/auth/esqueci-a-senha", response_model=schemas.PasswordResetResponse)
+# def esqueci_senha(payload: schemas.EsqueciSenha, db: Session = Depends(get_db)):
+#     start_op = time.time()
+#     if not payload.email:
+#         raise HTTPException(
+#             status_code=400, detail="Por favor, informe o e-mail de cadastro."
+#         )
+# 
+#     email_clean = payload.email.lower()
+#     user = db.query(User).filter(User.email == email_clean).first()
+# 
+#     token = create_access_token(
+#         {"email": email_clean, "purpose": "password-reset"},
+#         expires_delta=datetime.timedelta(hours=1),
+#     )
+# 
+#     if user:
+#         return {
+#             "message": "Instruções de recuperação e token de redefinição foram gerados com sucesso!",
+#             "tokenDemo": token,
+#             "emailSentTo": email_clean,
+#         }
+# 
+#     return {
+#         "message": "Se o e-mail estiver cadastrado em nosso sistema, você receberá o token de recuperação.",
+#         "tokenDemo": token,
+#         "emailSentTo": email_clean,
+#     }
 
 
 @app.post("/api/auth/reset-password")

@@ -88,3 +88,15 @@ def generate_password(password: str) -> str:
 
 def check_password(password: str, stored_password: str) -> bool:
     return pwd_context.verify(password, stored_password)
+
+
+def criar_token_recuperacao_senha(email: str) -> str:
+    expiracao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15)
+    
+    payload = {
+        "sub": email,
+        "type": "password_reset",
+        "exp": expiracao
+    }
+    
+    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
