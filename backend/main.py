@@ -40,7 +40,7 @@ from storage import storage_manager
 from email_service import enviar_email_recuperacao
 
 IS_DEVELOPMENT_ENV = True if os.getenv("APP_ENV") == "dev" else False
-FRONTEND_URL = "http://localhost:3000"
+FRONTEND_URL = "http://localhost:3000" if os.getenv("APP_ENV") == "dev" else "https://orcamentoeasy.com.br"
 
 Base.metadata.create_all(bind=engine)
 
