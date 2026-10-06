@@ -2,6 +2,6 @@
 .DS_Store
 .idea/
 .vscode/
-storage_minio_data/
+storage_seaweed_data/
 postgres_data/
 *~

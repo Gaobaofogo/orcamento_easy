@@ -485,7 +485,7 @@ console.log(editingOrcamento);
                         </label>
                         <input
                           type="text"
-                          placeholder="Ex: Instalação Elétrica Trifásica"
+                          placeholder="Ex: Guarda roupa"
                           {...register(`itens.${index}.servico` as const, {
                             required: 'O nome do serviço é obrigatório.'
                           })}
@@ -504,7 +504,7 @@ console.log(editingOrcamento);
                         <div className="relative">
                           <input
                             type="text"
-                            placeholder="Ex: Sala de Reuniões 02"
+                            placeholder="Ex: Quarto"
                             {...register(`itens.${index}.local` as const, {
                               required: 'O local é obrigatório.'
                             })}

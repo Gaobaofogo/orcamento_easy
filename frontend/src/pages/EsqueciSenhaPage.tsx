@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { esqueciSenhaApi, resetPasswordApi } from '../services/api';
-import { Mail, ArrowLeft, Key, CheckCircle, Lock, ShieldAlert, ArrowRight, Copy } from 'lucide-react';
+import { esqueciSenhaApi, resetPasswordApi, verificarTokenRecuperacaoApi } from '../services/api';
+import { Mail, ArrowLeft, Key, CheckCircle, Lock, ShieldAlert, ArrowRight, Copy, EyeOff, Eye } from 'lucide-react';
 
 interface EsqueciSenhaPageProps {
   navigate: (path: string) => void;
@@ -9,9 +9,17 @@ interface EsqueciSenhaPageProps {
 }
 
 export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, addToast }) => {
-  const [step, setStep] = useState<'request' | 'reset'>('request');
   const [loading, setLoading] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [isClickedGenerateRecoverCode, setIsClickedGenerateRecoverCode] = useState<boolean>(false);
+  const tokenQueryParam = new URLSearchParams(window.location.search).get('token');
+
+  const [isValidating, setIsValidating] = useState(true);
+  const [tokenValid, setTokenValid] = useState(false);
+  const [validationError, setValidationError] = useState('');
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Step 1 Form: Request Token
   const requestForm = useForm<{ email: string }>({
@@ -19,11 +27,37 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
   });
 
   // Step 2 Form: Reset Password
-  const resetForm = useForm<{ token: string; novaSenha: string; confirmaSenha: string }>({
-    defaultValues: { token: '', novaSenha: '', confirmaSenha: '' }
+  const resetForm = useForm<{novaSenha: string; confirmaSenha: string }>({
+    defaultValues: { novaSenha: '', confirmaSenha: '' }
   });
 
+  const senhaValue = resetForm.watch('novaSenha');
+  const confirmaSenhaValue = resetForm.watch('confirmaSenha');
+
+  useEffect(() => {
+    if (!tokenQueryParam) {
+      setIsValidating(false);
+      setTokenValid(false);
+      setValidationError('Token de redefinição não encontrado na URL.');
+      return;
+    }
+
+    verificarTokenRecuperacaoApi(tokenQueryParam)
+      .then(() => {
+        setTokenValid(true);
+      })
+      .catch((err) => {
+        navigate("/login");
+        setTokenValid(false);
+        setValidationError(err.message || 'O link de recuperação é inválido ou expirou.');
+      })
+      .finally(() => {
+        setIsValidating(false);
+      });
+  }, [tokenQueryParam]);
+
   const handleRequestToken = async (data: { email: string }) => {
+    setIsClickedGenerateRecoverCode(true);
     setLoading(true);
     try {
       const res = await esqueciSenhaApi(data.email);
@@ -31,10 +65,7 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
       
       if (res.tokenDemo) {
         setGeneratedToken(res.tokenDemo);
-        resetForm.setValue('token', res.tokenDemo);
       }
-      
-      setStep('reset');
     } catch (err: any) {
       addToast('Erro ao solicitar', 'error', err.message);
     } finally {
@@ -50,7 +81,7 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
 
     setLoading(true);
     try {
-      const res = await resetPasswordApi(data.token, data.novaSenha);
+      const res = await resetPasswordApi(tokenQueryParam, data.novaSenha);
       addToast('Senha redefinida com sucesso!', 'success', res.message);
       navigate('/login');
     } catch (err: any) {
@@ -75,6 +106,20 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
         </button>
 
         {/* Card */}
+        {isClickedGenerateRecoverCode ? (
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center justify-center p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                <Key className="w-6 h-6" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Recuperação de Senha</h2>
+              <p className="text-xs text-slate-400">
+                Se o e-mail informado estiver cadastrado em nossa base de dados, você receberá em poucos instantes uma mensagem com as instruções e o link para redefinir a sua senha.
+                <br/><br/>Dica: Se não encontrar o e-mail na sua caixa de entrada, verifique também a pasta de spam ou lixo eletrônico.
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6">
           <div className="space-y-2">
             <div className="inline-flex items-center justify-center p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
@@ -82,13 +127,127 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
             </div>
             <h2 className="text-2xl font-bold text-white">Recuperação de Senha</h2>
             <p className="text-xs text-slate-400">
-              {step === 'request'
-                ? 'Informe o e-mail cadastrado para gerar o código de redefinição de senha.'
-                : 'Valide seu código de recuperação e cadastre a nova senha.'}
+              {tokenQueryParam 
+                ? 'Digite sua nova senha abaixo.'
+                : 'Informe o e-mail cadastrado para gerar o código de redefinição de senha.'}
             </p>
           </div>
 
-          {step === 'request' ? (
+          {tokenQueryParam ? (
+            /* STEP 2: RESET PASSWORD WITH TOKEN */
+            <form onSubmit={resetForm.handleSubmit(handleResetPassword)} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Nova Senha
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Nova senha"
+                    {...resetForm.register('novaSenha', {
+                      required: 'A nova senha é obrigatória.',
+                      minLength: { value: 4, message: 'Mínimo de 4 caracteres.' }
+                    })}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                <button
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+                </div>
+                {resetForm.formState.errors.novaSenha && (
+                  <p className="text-xs text-rose-400">{resetForm.formState.errors.novaSenha.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Confirmar Nova Senha
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Repita a nova senha"
+                    {...resetForm.register('confirmaSenha', {
+                      required: 'A confirmação de senha é obrigatória.'
+                    })}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+            {/* Password Requeriments Indicators */}
+            <div className="p-3 bg-slate-50 rounded-xl bg-slate-950 border border-slate-800/90 mt-5 text-[11px] space-y-1 text-slate-600">
+              <p className="font-semibold text-slate-300 text-xs mb-1">Requisitos de Segurança para a Senha:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1">
+                <span className={`flex items-center gap-1 ${senhaValue?.length >= 8 ? 'text-emerald-600 font-semibold' : 'text-slate-300'}`}>
+                  {senhaValue?.length >= 8 ? '✓' : '•'} Mínimo de 8 caracteres
+                </span>
+                <span className={`flex items-center gap-1 ${/[A-Z]/.test(senhaValue || '') ? 'text-emerald-600 font-semibold' : 'text-slate-300'}`}>
+                  {/[A-Z]/.test(senhaValue || '') ? '✓' : '•'} Pelo menos 1 letra maiúscula
+                </span>
+                <span className={`flex items-center gap-1 ${/[a-z]/.test(senhaValue || '') ? 'text-emerald-600 font-semibold' : 'text-slate-300'}`}>
+                  {/[a-z]/.test(senhaValue || '') ? '✓' : '•'} Pelo menos 1 letra minúscula
+                </span>
+                <span className={`flex items-center gap-1 ${/\d/.test(senhaValue || '') ? 'text-emerald-600 font-semibold' : 'text-slate-300'}`}>
+                  {/\d/.test(senhaValue || '') ? '✓' : '•'} Pelo menos 1 número
+                </span>
+                <span className={`flex items-center gap-1 sm:col-span-2 ${/[^A-Za-z0-9]/.test(senhaValue || '') ? 'text-emerald-600 font-semibold' : 'text-slate-300'}`}>
+                  {/[^A-Za-z0-9]/.test(senhaValue || '') ? '✓' : '•'} Pelo menos 1 caractere especial (@, #, $, !, etc.)
+                </span>
+                <span className={`flex items-center gap-1 sm:col-span-2 ${(senhaValue.length > 0 && confirmaSenhaValue.length > 0 && senhaValue == confirmaSenhaValue) ? 'text-emerald-600 font-semibold' : 'text-slate-300'}`}>
+                  {(senhaValue.length > 0 && confirmaSenhaValue.length > 0 && senhaValue == confirmaSenhaValue) ? '✓' : '•'} As senhas devem ser iguais
+                </span>
+              </div>
+            </div>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('request')}
+                  className="w-1/3 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-2/3 py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-100 hover:text-slate-100 font-bold rounded-xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-950 border-t-transparent" />
+                  ) : (
+                    'Salvar Nova Senha'
+                  )}
+                </button>
+              </div>
+            </form>
+          ) : (
             /* STEP 1: REQUEST TOKEN */
             <form onSubmit={requestForm.handleSubmit(handleRequestToken)} className="space-y-5">
               <div className="space-y-1.5">
@@ -116,7 +275,7 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-200 hover:text-slate-100 font-bold rounded-xl text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 {loading ? (
                   <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-950 border-t-transparent" />
@@ -128,111 +287,9 @@ export const EsqueciSenhaPage: React.FC<EsqueciSenhaPageProps> = ({ navigate, ad
                 )}
               </button>
             </form>
-          ) : (
-            /* STEP 2: RESET PASSWORD WITH TOKEN */
-            <form onSubmit={resetForm.handleSubmit(handleResetPassword)} className="space-y-4">
-              {/* Token banner display */}
-              {generatedToken && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-300 uppercase">Código Gerado:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(generatedToken);
-                        addToast('Código copiado!', 'info');
-                      }}
-                      className="text-[10px] text-amber-400 hover:underline flex items-center gap-1"
-                    >
-                      <Copy className="w-3 h-3" /> Copiar
-                    </button>
-                  </div>
-                  <p className="font-mono text-[11px] text-slate-300 break-all bg-slate-950 p-2 rounded border border-slate-800 max-h-16 overflow-y-auto">
-                    {generatedToken}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Código de Redefinição
-                </label>
-                <input
-                  type="text"
-                  placeholder="Cole o código de recuperação aqui..."
-                  {...resetForm.register('token', { required: 'O código é obrigatório.' })}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                />
-                {resetForm.formState.errors.token && (
-                  <p className="text-xs text-rose-400">{resetForm.formState.errors.token.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Nova Senha
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="password"
-                    placeholder="Nova senha segura"
-                    {...resetForm.register('novaSenha', {
-                      required: 'A nova senha é obrigatória.',
-                      minLength: { value: 4, message: 'Mínimo de 4 caracteres.' }
-                    })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                {resetForm.formState.errors.novaSenha && (
-                  <p className="text-xs text-rose-400">{resetForm.formState.errors.novaSenha.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Confirmar Nova Senha
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="password"
-                    placeholder="Repita a nova senha"
-                    {...resetForm.register('confirmaSenha', {
-                      required: 'A confirmação de senha é obrigatória.'
-                    })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep('request')}
-                  className="w-1/3 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors"
-                >
-                  Voltar
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-2/3 py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                >
-                  {loading ? (
-                    <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-950 border-t-transparent" />
-                  ) : (
-                    'Salvar Nova Senha'
-                  )}
-                </button>
-              </div>
-            </form>
           )}
         </div>
+        )}
       </div>
     </div>
   );

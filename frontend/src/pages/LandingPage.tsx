@@ -120,21 +120,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ navigate }) => {
               </>
             )}
           </div>
-
-          <div className="pt-8 flex flex-wrap items-center justify-center gap-6 sm:gap-12 text-xs text-slate-400 font-medium">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Sem necessidade de cartão de crédito</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Cálculo preciso de chapas de MDF</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Geração de PDF com sua marca</span>
-            </div>
-          </div>
         </div>
       </section>
 

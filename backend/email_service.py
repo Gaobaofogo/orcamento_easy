@@ -15,18 +15,12 @@ class Settings:
 settings = Settings()
 
 def enviar_email_recuperacao(email_destino: str, link_recuperacao: str):
-    print(settings.SMTP_HOST)
-    print(settings.SMTP_PORT)
-    print(settings.SMTP_USER)
-    print(settings.SMTP_PASSWORD)
-    print(settings.MAIL_FROM)
-    print(settings.MAIL_FROM_NAME)
     """
     Envia o e-mail contendo o link com token de recuperação de senha.
     """
     # 1. Montagem da Mensagem
     mensagem = MIMEMultipart("alternative")
-    mensagem["Subject"] = "Recuperação de Senha - Orçamento Easy"
+    mensagem["Subject"] = "Recuperação de Senha"
     mensagem["From"] = f"{settings.MAIL_FROM_NAME} <{settings.MAIL_FROM}>"
     mensagem["To"] = email_destino
 
@@ -66,8 +60,7 @@ def enviar_email_recuperacao(email_destino: str, link_recuperacao: str):
 
     # 2. Conexão e Envio via SMTP
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.starttls()  # Eleva a conexão para TLS/criptografada
+        with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.sendmail(settings.MAIL_FROM, email_destino, mensagem.as_string())
     except Exception as e:

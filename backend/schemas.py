@@ -85,6 +85,10 @@ class PasswordResetResponse(BaseModel):
     tokenDemo: Optional[str] = None
     emailSentTo: Optional[str] = None
 
+class RedefinirSenhaSchema(BaseModel):
+    token: str
+    novaSenha: str = Field(min_length=8, max_length=64)
+
 
 class ClienteCreate(BaseModel):
     nome: str

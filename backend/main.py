@@ -15,7 +15,8 @@ from fastapi import (
     Request,
     UploadFile,
     status,
-    BackgroundTasks
+    BackgroundTasks,
+    Query
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -39,6 +40,7 @@ from storage import storage_manager
 from email_service import enviar_email_recuperacao
 
 IS_DEVELOPMENT_ENV = True if os.getenv("APP_ENV") == "dev" else False
+FRONTEND_URL = "http://localhost:3000"
 
 Base.metadata.create_all(bind=engine)
 
@@ -307,32 +309,104 @@ def change_password(
     db.commit()
     return {"message": "Senha alterada com sucesso!"}
 
-FRONTEND_URL = "http://localhost:3000"
 
 @app.post("/api/auth/esqueci-a-senha", response_model=schemas.PasswordResetResponse)
 def esqueci_senha(payload: schemas.SolicitacaoRecuperacaoSchema, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    # 1. Busca o usuário no banco de dados
     user = db.query(User).filter(User.email == payload.email).first()
-
-    # 2. Se o e-mail existir, gera o token real e envia a mensagem
     if user:
-        # Gera o JWT assinado para recuperação
         token_recuperacao = criar_token_recuperacao_senha(str(user.email))
-        
-        # Link real que o usuário clicará no e-mail
-        link_recuperacao = f"{FRONTEND_URL}/reset-password?token={token_recuperacao}"
+        link_recuperacao = f"{FRONTEND_URL}/esqueci-a-senha?token={token_recuperacao}"
 
-        # Adiciona a tarefa de envio de e-mail em segundo plano
         background_tasks.add_task(
             enviar_email_recuperacao,
             email_destino=str(user.email),
             link_recuperacao=link_recuperacao
         )
 
-    # 3. Retorna resposta genérica para não expor a existência de e-mails na base
     return {
         "message": "Se o e-mail estiver cadastrado em nosso sistema, você receberá um link para redefinir sua senha."
     }
+
+@app.get("/api/auth/verify-reset-token", status_code=status.HTTP_200_OK)
+def verificar_token_recuperacao(
+    token: str = Query(..., description="Token JWT recebido no link do e-mail"),
+    db: Session = Depends(get_db)
+):
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "password_reset":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tipo de token inválido."
+            )
+            
+        email: str = payload.get("sub", "")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token com payload inválido."
+            )
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O link de recuperação de senha expirou. Solicite um novo link."
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Link de recuperação inválido ou adulterado."
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário associado a este token não foi encontrado."
+        )
+
+    return {
+        "valid": True,
+        "message": "Token válido."
+    }
+
+@app.post("/api/auth/reset-password", status_code=status.HTTP_200_OK)
+def redefinir_senha(
+    payload_data: schemas.RedefinirSenhaSchema,
+    db: Session = Depends(get_db)
+):
+    try:
+        payload = decode_token(payload_data.token)
+        
+        if payload.get("type") != "password_reset":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Tipo de token inválido."
+            )
+            
+        email: str = payload.get("sub", "")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="O link de recuperação expirou."
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Token inválido."
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Usuário não encontrado."
+        )
+
+    user.senha = generate_password(payload_data.novaSenha)
+    db.commit()
+
+    return {"message": "Senha alterada com sucesso!"}
 
 # @app.post("/api/auth/esqueci-a-senha", response_model=schemas.PasswordResetResponse)
 # def esqueci_senha(payload: schemas.EsqueciSenha, db: Session = Depends(get_db)):
@@ -366,7 +440,6 @@ def esqueci_senha(payload: schemas.SolicitacaoRecuperacaoSchema, background_task
 
 @app.post("/api/auth/reset-password")
 def reset_password(payload: schemas.ResetPassword, db: Session = Depends(get_db)):
-    start_op = time.time()
     if not payload.token or not payload.novaSenha:
         raise HTTPException(
             status_code=400,

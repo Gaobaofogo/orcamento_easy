@@ -340,6 +340,34 @@ export async function deleteOrcamento(id: string): Promise<{ message: string }> 
   return data;
 }
 
+export async function verificarTokenRecuperacaoApi(token: string): Promise<boolean> {
+  const res = await apiFetch(`/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`, {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Link de recuperação inválido ou expirado.');
+  }
+
+  return true;
+}
+
+export async function redefinirSenhaApi(token: string, novaSenha: string): Promise<void> {
+  const res = await apiFetch('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token,
+      nova_senha: novaSenha,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Não foi possível redefinir sua senha.');
+  }
+}
+
 export async function getOrcamentoFile(orcamento_id: string): Promise<File> {
   const res = await apiFetch(`/api/orcamentos/${orcamento_id}/pdf`, {
     method: 'GET',

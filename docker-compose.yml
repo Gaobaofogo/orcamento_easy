@@ -18,36 +18,45 @@ services:
       timeout: 5s
       retries: 5
 
-  # Serviço do MinIO
+# Serviço do SeaweedFS
   storage:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
+    image: chrislusf/seaweedfs:latest
     container_name: marcenaria_storage
-    command: server /data --console-address ":9001"
+    command: >
+      server
+      -dir=/data
+      -s3
+      -s3.port=9000
+      -filer
     ports:
-      - "127.0.0.1:9001:9001"
+      - "9001:8888" # Mapeia a porta 9001 do seu navegador para a interface web do Filer (8888)
+      - "9000:9000" # Porta de API do S3 (para o FastAPI backend usar)
+      - "9333:9333" # (Opcional) Porta do Master Server
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - SEAWEEDFS_S3_ALLOW_EMPTY_FOLDER=true
     volumes:
-      - ./storage_minio_data:/data
+      - ./storage_seaweed_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/"]
       interval: 5s
       timeout: 5s
       retries: 5
+  # Serviço do SeaweedFS (Substituindo o MinIO)
 
-  # Utilitário para criar o bucket
+  # Utilitário para criar o bucket no SeaweedFS via CLI S3 oficial da AWS
   createbuckets:
-    image: minio/mc:RELEASE.2024-01-16T16-06-34Z
+    image: amazon/aws-cli:latest
     container_name: marcenaria_createbuckets
     depends_on:
       storage:
         condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
     entrypoint: >
       /bin/sh -c '
-      /usr/bin/mc alias set myminio http://storage:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD";
-      /usr/bin/mc mb myminio/marcenaria-uploads --ignore-existing;
-      /usr/bin/mc anonymous set download myminio/marcenaria-uploads;
+      aws --endpoint-url http://storage:9000 s3 mb s3://marcenaria-uploads || true;
       exit 0;
       '
 
@@ -70,7 +79,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB}
       - MINIO_ENDPOINT=storage:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
@@ -91,7 +99,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - backend_uploads:/app/uploads
-      - ./backend:/app/backend
+      - ./backend:/app
 
   frontend:
     build:
@@ -127,7 +135,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB}
       - MINIO_ENDPOINT=storage:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
@@ -174,4 +181,3 @@ volumes:
     driver: local
   backend_uploads:
     driver: local
-
